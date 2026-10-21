@@ -7,7 +7,7 @@
   :root{
     --bg:#f4f6f8; --card:#fff; --ink:#15202b; --muted:#5f6b77; --line:#e3e8ee; --soft:#eef2f5;
     --brand:#0b5d3b; --brand-ink:#fff;
-    --home:#2563eb; --away:#ea580c;             /* venue encoding (CVD-validated pair) */
+    --home:#2563eb; --away:#ea580c;               /* venue encoding (CVD-validated pair) */
     --win:#0d9488; --loss:#dc2626; --draw:#8a8f98; /* results (CVD-validated, always lettered) */
     --s-grey:#64748b; --s-ok:#0b7a4b; --s-warn:#b45309; --s-bad:#dc2626;
   }
@@ -16,141 +16,166 @@
       --brand:#17885a; --home:#3b82f6; --away:#f97316; --win:#14b8a6; --loss:#ef4444; --draw:#9aa1aa; }
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
-  header{background:var(--brand);color:var(--brand-ink);padding:16px 16px 12px;position:sticky;top:0;z-index:5}
-  .top{display:flex;align-items:center;gap:8px}
-  .top h1{font-size:19px;margin:0;flex:1;letter-spacing:.2px}
-  .icon-btn{background:rgba(255,255,255,.16);border:0;color:#fff;border-radius:10px;height:36px;min-width:36px;padding:0 10px;font-size:15px;cursor:pointer}
-  .icon-btn.on{background:#fff;color:var(--brand);font-weight:600}
-  .sub{font-size:12px;opacity:.85;margin-top:4px}
-  .tabs{display:flex;gap:6px;margin-top:12px}
-  .tab{flex:1;border:0;border-radius:10px;padding:8px 4px;background:rgba(255,255,255,.14);color:#fff;font-size:14px;cursor:pointer}
-  .tab.on{background:#fff;color:var(--brand);font-weight:600}
-  .controls{padding:12px 16px 4px;display:flex;flex-direction:column;gap:10px;max-width:760px;margin:0 auto}
-  .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
-  .chip{white-space:nowrap;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
-  .chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
-  .bar2{display:flex;gap:8px;align-items:center}
-  .search{flex:1;min-width:0;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:15px}
-  .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;flex:0 0 auto}
-  .seg button{border:0;background:transparent;color:var(--muted);padding:7px 11px;border-radius:7px;font-size:13px;cursor:pointer}
-  .seg button.on{background:var(--brand);color:#fff;font-weight:600}
-  .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);align-items:center}
-  .legend i{display:inline-block;width:14px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
-  .sw-home{background:var(--home)} .sw-away{background:var(--away)}
-  .sw-conf{background:linear-gradient(90deg,var(--home) 50%,var(--away) 50%)} .sw-tbc{border:1.5px dashed var(--muted);background:transparent}
-  main{padding:4px 16px 100px;max-width:760px;margin:0 auto}
-  .day{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:18px 2px 8px}
-  .day .today{color:var(--brand);margin-left:6px}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
 
-  /* match card: left stripe = venue colour; solid = confirmed, dashed = TBC */
-  .card{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--s-grey);border-radius:14px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px}
-  .card.home{border-left-color:var(--home)} .card.away{border-left-color:var(--away)}
-  .card.tbc{border-left-style:dashed}
-  .card.edit{cursor:pointer}
-  .card.cancel{opacity:.55}
-  .time{min-width:52px;font-weight:700;font-size:16px;padding-top:2px}
-  .body{flex:1;min-width:0}
-  .team{font-size:12px;font-weight:600;color:var(--muted)}
-  .vs{font-size:16px;font-weight:600;margin:2px 0 6px;overflow-wrap:anywhere}
-  .vs span{color:var(--muted);font-weight:400}
-  .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
-  .pill{border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.4px}
-  .pill.outline{background:transparent!important;border:1.5px dashed currentColor;padding:1px 6px}
-  .res{border-radius:8px;padding:3px 8px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+  /* compact header */
+  header{background:var(--brand);color:var(--brand-ink);padding:10px 12px 8px;position:sticky;top:0;z-index:5}
+  .top{display:flex;align-items:center;gap:6px}
+  .top h1{font-size:17px;margin:0;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub{font-size:11px;opacity:.85;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:4px}
+  .icon-btn{background:rgba(255,255,255,.16);border:0;color:#fff;border-radius:8px;height:30px;min-width:30px;padding:0 9px;font-size:14px;cursor:pointer;flex:0 0 auto}
+  .icon-btn.on{background:#fff;color:var(--brand);font-weight:600}
+  .tabs{display:flex;gap:4px;margin-top:8px}
+  .tab{flex:1;border:0;border-radius:8px;padding:6px 2px;background:rgba(255,255,255,.14);color:#fff;font-size:13px;cursor:pointer;white-space:nowrap}
+  .tab.on{background:#fff;color:var(--brand);font-weight:600}
+  .tab.admin-only{display:none}
+  body.admin .tab.admin-only{display:block}
+
+  .controls{padding:8px 12px 0;display:flex;flex-direction:column;gap:6px;max-width:760px;margin:0 auto}
+  .chips{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none}
+  .chip{white-space:nowrap;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}
+  .chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .bar2{display:flex;gap:6px;align-items:center}
+  .search{flex:1;min-width:0;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 10px;font-size:14px}
+  .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:2px;flex:0 0 auto}
+  .seg button{border:0;background:transparent;color:var(--muted);padding:5px 9px;border-radius:6px;font-size:12px;cursor:pointer}
+  .seg button.on{background:var(--brand);color:#fff;font-weight:600}
+  .legend{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:11px;color:var(--muted);align-items:center}
+  .legend i{display:inline-block;width:12px;height:8px;border-radius:2px;margin-right:4px;vertical-align:0}
+  .sw-home{background:var(--home)} .sw-away{background:var(--away)}
+  .sw-tbc{border:1.5px dashed var(--muted);background:transparent}
+  main{padding:4px 12px 90px;max-width:760px;margin:0 auto}
+  .day{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:10px 2px 4px}
+  .empty,.msg{text-align:center;color:var(--muted);padding:32px 16px}
+
+  /* compact match row: left stripe = venue colour; solid = confirmed, dashed = TBC */
+  .m{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--s-grey);border-radius:8px;margin-bottom:3px;cursor:pointer}
+  .m.home{border-left-color:var(--home)} .m.away{border-left-color:var(--away)}
+  .m.tbc{border-left-style:dashed}
+  .m.cancel .r1{opacity:.55} .m.cancel .opp{text-decoration:line-through}
+  .r1{display:grid;grid-template-columns:66px 36px 16px 1fr auto;gap:6px;align-items:center;padding:6px 8px;min-height:34px}
+  .dt{font-size:12px;font-weight:600;white-space:nowrap}
+  .dt.today{color:var(--brand)}
+  .tm{font-size:12px;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .ha{font-size:10px;font-weight:800;color:#fff;border-radius:3px;text-align:center;line-height:15px}
+  .ha.home{background:var(--home)} .ha.away{background:var(--away)} .ha.neutral{background:var(--s-grey)}
+  .who{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+  .who .tag{font-size:10px;font-weight:700;color:var(--muted);margin-right:4px}
+  .who .opp{font-weight:600}
+  .who .at{color:var(--muted)}
+  .rt{font-size:11px;font-weight:700;white-space:nowrap}
+  .res{border-radius:5px;padding:2px 6px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap}
   .res.W{background:var(--win)} .res.L{background:var(--loss)} .res.D{background:var(--draw)}
-  .loc{color:var(--muted);text-decoration:none;overflow-wrap:anywhere}
-  .loc:hover{text-decoration:underline}
-  .empty,.msg{text-align:center;color:var(--muted);padding:40px 16px}
+  .st{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase}
+  .st.ok{color:var(--s-ok)} .st.warn{color:var(--s-warn)} .st.bad{color:var(--s-bad)}
+  .r2{display:none;padding:2px 10px 8px 10px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line)}
+  .m.open .r2{display:block}
+  .r2 div{margin-top:5px}
+  .r2 b{color:var(--ink);font-weight:600}
+  .r2 a{color:var(--brand)}
+  .editbtn{margin-top:8px;border:0;background:var(--brand);color:#fff;border-radius:7px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer}
 
   /* calendar */
-  .cal{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;margin-top:12px}
-  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-  .cal-head b{font-size:16px}
-  .cal-nav{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;width:36px;height:32px;font-size:16px;cursor:pointer}
-  .grid7{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-  .dow{font-size:11px;font-weight:700;color:var(--muted);text-align:center;padding:2px 0}
-  .cell{min-height:64px;border-radius:8px;padding:3px;background:var(--soft);cursor:pointer;display:flex;flex-direction:column;gap:2px;overflow:hidden;border:2px solid transparent}
+  .cal{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px;margin-top:8px}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .cal-head b{font-size:15px}
+  .cal-nav{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:7px;width:32px;height:28px;font-size:15px;cursor:pointer}
+  .grid7{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .dow{font-size:10px;font-weight:700;color:var(--muted);text-align:center}
+  .cell{min-height:50px;border-radius:6px;padding:2px;background:var(--soft);cursor:pointer;display:flex;flex-direction:column;gap:2px;overflow:hidden;border:2px solid transparent}
   .cell.out{background:transparent;cursor:default}
   .cell.today .dn{background:var(--brand);color:#fff;border-radius:999px}
   .cell.sel{border-color:var(--brand)}
-  .dn{font-size:11px;font-weight:600;color:var(--muted);align-self:flex-start;min-width:18px;text-align:center;padding:0 3px}
-  .mc{font-size:9px;line-height:1.3;font-weight:700;letter-spacing:-.2px;border-radius:4px;padding:1px 2px;white-space:nowrap;overflow:hidden;text-overflow:clip;color:#fff;text-align:center}
+  .dn{font-size:10px;font-weight:600;color:var(--muted);align-self:flex-start;min-width:16px;text-align:center;padding:0 2px}
+  .mc{font-size:9px;line-height:1.3;font-weight:700;letter-spacing:-.2px;border-radius:3px;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:clip;color:#fff;text-align:center}
   .mc.home{background:var(--home)} .mc.away{background:var(--away)} .mc.neutral{background:var(--s-grey)}
   .mc.tbc{background:transparent;color:var(--ink);border:1.5px dashed}
   .mc.tbc.home{border-color:var(--home)} .mc.tbc.away{border-color:var(--away)} .mc.tbc.neutral{border-color:var(--s-grey)}
   .mc.cancel{text-decoration:line-through;opacity:.6}
-  .more{font-size:9.5px;color:var(--muted);font-weight:600;padding-left:2px}
-  @media(min-width:600px){ .cell{min-height:84px} .mc{font-size:11px} }
+  .more{font-size:9px;color:var(--muted);font-weight:600;padding-left:2px}
+  @media(min-width:600px){ .cell{min-height:72px} .mc{font-size:11px} }
 
   /* stats */
-  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-top:12px}
-  .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
-  .tile .k{font-size:12px;color:var(--muted);font-weight:600}
-  .tile .v{font-size:26px;font-weight:700;margin-top:2px}
-  .tile .v small{font-size:13px;color:var(--muted);font-weight:500}
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:10px}
-  .panel h3{margin:0 0 10px;font-size:14px}
-  .stack{display:flex;gap:2px;height:22px;border-radius:6px;overflow:hidden;background:var(--soft)}
+  .tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px}
+  .tile .k{font-size:11px;color:var(--muted);font-weight:600}
+  .tile .v{font-size:22px;font-weight:700;margin-top:2px}
+  .tile .v small{font-size:12px;color:var(--muted);font-weight:500}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px}
+  .panel h3{margin:0 0 8px;font-size:13px}
+  .stack{display:flex;gap:2px;height:20px;border-radius:5px;overflow:hidden;background:var(--soft)}
   .stack > div{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;min-width:0}
   .stack .W{background:var(--win)} .stack .L{background:var(--loss)} .stack .D{background:var(--draw)}
   .stack .C{background:var(--s-ok)} .stack .T{background:transparent;color:var(--ink);border:1.5px dashed var(--muted);border-radius:4px}
-  .srow{display:grid;grid-template-columns:56px 1fr 92px;gap:10px;align-items:center;margin:8px 0;font-size:13px}
+  .srow{display:grid;grid-template-columns:50px 1fr 84px;gap:8px;align-items:center;margin:6px 0;font-size:13px}
   .srow .lbl{font-weight:600}
   .srow .num{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
-  .slegend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
-  .slegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
-  table.tt{width:100%;border-collapse:collapse;font-size:13px}
-  .tt th{text-align:left;font-size:11px;color:var(--muted);font-weight:700;padding:6px 4px;border-bottom:1px solid var(--line)}
-  .tt td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+  .slegend{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+  .slegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px}
+  table.tt{width:100%;border-collapse:collapse;font-size:12.5px}
+  .tt th{text-align:left;font-size:10.5px;color:var(--muted);font-weight:700;padding:5px 3px;border-bottom:1px solid var(--line)}
+  .tt td{padding:6px 3px;border-bottom:1px solid var(--line);vertical-align:middle}
   .tt td.n,.tt th.n{text-align:right;font-variant-numeric:tabular-nums}
-  .form{display:flex;gap:3px}
-  .form span{width:18px;height:18px;border-radius:4px;font-size:10px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center}
+  .form{display:flex;gap:2px}
+  .form span{width:16px;height:16px;border-radius:3px;font-size:9.5px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center}
   .form .W{background:var(--win)} .form .L{background:var(--loss)} .form .D{background:var(--draw)}
   .hide-sm{display:none} @media(min-width:520px){.hide-sm{display:table-cell}}
 
-  .fab{position:fixed;right:18px;bottom:22px;background:var(--brand);color:#fff;border:0;border-radius:999px;padding:14px 20px;font-size:15px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer;display:none}
+  /* locations (admin) */
+  .loc{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:4px;display:flex;gap:10px;align-items:center;cursor:pointer}
+  .loc .nm{font-weight:600;font-size:14px}
+  .loc .ad{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .loc .ad.missing{color:var(--s-warn)}
+  .loc .cnt{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap;text-align:right}
+  .loc .grow{min-width:0;flex:1}
+  .hint{font-size:12px;color:var(--muted);margin:8px 2px}
+
+  .fab{position:fixed;right:16px;bottom:18px;background:var(--brand);color:#fff;border:0;border-radius:999px;padding:12px 18px;font-size:14px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer;display:none}
   .fab.show{display:block}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:20}
   .overlay.show{display:flex}
-  .sheet{background:var(--card);width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:18px 16px 24px;max-height:92vh;overflow:auto}
-  @media(min-width:600px){.overlay{align-items:center}.sheet{border-radius:18px}}
-  .sheet h2{margin:0 0 14px;font-size:18px}
-  .sheet h4{margin:16px 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
-  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
-  input,select{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:10px;font-size:15px}
-  .row{display:flex;gap:8px;margin-top:16px}
-  .btn{flex:1;border:0;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer}
+  .sheet{background:var(--card);width:100%;max-width:560px;border-radius:16px 16px 0 0;padding:16px 14px 20px;max-height:92vh;overflow:auto}
+  @media(min-width:600px){.overlay{align-items:center}.sheet{border-radius:16px}}
+  .sheet h2{margin:0 0 12px;font-size:17px}
+  .sheet h4{margin:14px 0 6px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .full{grid-column:1/-1}
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:3px}
+  input,select{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:9px;font-size:15px}
+  .check{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--ink);font-weight:500}
+  .check input{width:auto}
+  .row{display:flex;gap:8px;margin-top:14px}
+  .btn{flex:1;border:0;border-radius:9px;padding:11px;font-size:15px;font-weight:600;cursor:pointer}
   .primary{background:var(--brand);color:#fff}
   .ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
   .danger{background:transparent;color:var(--s-bad);border:1px solid var(--s-bad)}
-  .err{color:var(--s-bad);font-size:13px;margin-top:10px;min-height:1em}
-  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10}
+  .err{color:var(--s-bad);font-size:13px;margin-top:8px;min-height:1em}
+  .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#111;color:#fff;padding:9px 14px;border-radius:9px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10}
   .toast.show{opacity:.92}
-  .gate{max-width:360px;margin:60px auto;padding:0 16px;text-align:center}
+  .gate{max-width:360px;margin:50px auto;padding:0 16px;text-align:center}
 </style>
 </head>
 <body>
 <header>
   <div class="top">
     <h1 id="club">Fixtures</h1>
+    <span class="sub" id="sub">Loading…</span>
     <button class="icon-btn" id="refreshBtn" title="Refresh" aria-label="Refresh">⟳</button>
-    <button class="icon-btn" id="adminBtn" title="Admin" style="display:none">🔒</button>
+    <button class="icon-btn" id="adminBtn" title="Admin login" style="display:none">🔒</button>
   </div>
-  <div class="sub" id="sub">Loading…</div>
   <div class="tabs" id="tabs">
     <button class="tab on" data-view="upcoming">Upcoming</button>
     <button class="tab" data-view="past">Results</button>
     <button class="tab" data-view="all">All</button>
     <button class="tab" data-view="stats">Stats</button>
+    <button class="tab admin-only" data-view="places">Locations</button>
   </div>
 </header>
 
 <div class="controls" id="controls">
   <div class="chips" id="chips"></div>
   <div class="bar2" id="listControls">
-    <input class="search" id="search" type="search" placeholder="Search opponent, location…">
+    <input class="search" id="search" type="search" placeholder="Search…">
     <div class="seg" id="mode">
       <button class="on" data-mode="list">List</button>
       <button data-mode="cal">Calendar</button>
@@ -159,29 +184,30 @@
   <div class="legend" id="legend">
     <span><i class="sw-home"></i>Home</span>
     <span><i class="sw-away"></i>Away</span>
-    <span><i class="sw-conf"></i>Solid = confirmed</span>
     <span><i class="sw-tbc"></i>Dashed = TBC / not scheduled</span>
+    <span>· Tap a match for details</span>
   </div>
 </div>
 
 <main id="list"><div class="msg">Loading fixtures…</div></main>
 <button class="fab" id="fab">+ Add match</button>
 
-<!-- PIN prompt -->
+<!-- Admin login -->
 <div class="overlay" id="pinOverlay">
   <div class="sheet">
     <h2>Admin login</h2>
-    <label for="pinInput">Admin PIN</label>
-    <input id="pinInput" type="password" inputmode="numeric" autocomplete="off">
+    <label for="pinInput">Admin password</label>
+    <input id="pinInput" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false">
+    <label class="check"><input type="checkbox" id="pinRemember"> Keep me signed in on this device</label>
     <div class="err" id="pinErr"></div>
     <div class="row">
       <button class="btn ghost" id="pinCancel">Cancel</button>
-      <button class="btn primary" id="pinOk">Unlock</button>
+      <button class="btn primary" id="pinOk">Sign in</button>
     </div>
   </div>
 </div>
 
-<!-- Edit form -->
+<!-- Match form -->
 <div class="overlay" id="formOverlay">
   <div class="sheet">
     <h2 id="formTitle">Add match</h2>
@@ -193,7 +219,7 @@
         <select id="f_dateNote"><option value="">—</option><option>TBC</option><option>Internal</option></select>
       </div>
       <div><label>Time</label><input id="f_time" type="time"></div>
-      <div><label>Location</label><input id="f_place" list="placeList" placeholder="e.g. Celbridge"></div>
+      <div><label>Location</label><input id="f_place" list="placeDL" placeholder="e.g. Celbridge"></div>
       <div><label>Venue</label>
         <select id="f_venue"><option value="">—</option><option>Home</option><option>Away</option><option>Neutral</option></select>
       </div>
@@ -209,12 +235,31 @@
       <div><label>Score (ours – theirs)</label><input id="f_score" placeholder="e.g. 5-3"></div>
     </div>
     <datalist id="teamList"></datalist>
-    <datalist id="placeList"></datalist>
+    <datalist id="placeDL"></datalist>
     <div class="err" id="formErr"></div>
     <div class="row">
-      <button class="btn danger" id="delBtn" style="flex:0 0 auto;padding:12px 16px">Delete</button>
+      <button class="btn danger" id="delBtn" style="flex:0 0 auto;padding:11px 14px">Delete</button>
       <button class="btn ghost" id="formCancel">Cancel</button>
       <button class="btn primary" id="saveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Location form -->
+<div class="overlay" id="placeOverlay">
+  <div class="sheet">
+    <h2 id="placeTitle">Add location</h2>
+    <div class="fgrid">
+      <div class="full"><label>Name (as used in fixtures)</label><input id="p_name" placeholder="e.g. Terenure"></div>
+      <div class="full"><label>Address or Eircode (for Google Maps)</label><input id="p_addr" placeholder="Street address or Eircode"></div>
+    </div>
+    <label class="check" id="p_renameWrap"><input type="checkbox" id="p_rename" checked> <span id="p_renameTxt">Also rename it in matches</span></label>
+    <div class="hint"><a href="#" id="p_test" target="_blank" style="color:var(--brand)">Check it in Google Maps ↗</a></div>
+    <div class="err" id="placeErr"></div>
+    <div class="row">
+      <button class="btn danger" id="pDel" style="flex:0 0 auto;padding:11px 14px">Delete</button>
+      <button class="btn ghost" id="pCancel">Cancel</button>
+      <button class="btn primary" id="pSave">Save</button>
     </div>
   </div>
 </div>
@@ -224,7 +269,7 @@
 <script>
 const FIELDS = ['ourTeam','opponent','venue','homeTeam','awayTeam','status','result','score','date','dateNote','time','place'];
 const NO_MAP = ['', 'tbc', 'internal'];
-const state = { data:null, view:'upcoming', mode:'list', team:'', q:'', pin:'', editing:null, calMonth:null, calDay:null };
+const state = { data:null, view:'upcoming', mode:'list', team:'', q:'', pin:'', editing:null, editPlace:null, calMonth:null, calDay:null, open:{} };
 const $ = id => document.getElementById(id);
 
 const store = {
@@ -247,6 +292,8 @@ function dayLabel(s){
   const d = parseISO(s);
   return d.toLocaleDateString('en-IE',{weekday:'short',day:'numeric',month:'short',year: d.getFullYear()!==new Date().getFullYear()?'numeric':undefined});
 }
+const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function shortDate(s){ const d = parseISO(s); return DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()]; }
 
 // ---- match classification ----
 function side(m){ const v=(m.venue||'').toLowerCase(); return v.startsWith('home')?'home':v.startsWith('away')?'away':'neutral'; }
@@ -256,13 +303,12 @@ function isConfirmed(m){
   if(res(m)) return true;
   return isISO(m.date) && /^(sched|conf|play|complete)/i.test(m.status||'');
 }
-function statusColor(s){
+function statusClass(s){
   const k=(s||'').toLowerCase();
-  if(k.startsWith('not')) return 'var(--s-grey)';
-  if(k.startsWith('conf')||k.startsWith('sched')||k.startsWith('play')) return 'var(--s-ok)';
-  if(k.startsWith('post')||k.includes('tbc')) return 'var(--s-warn)';
-  if(k.startsWith('canc')||k.includes('forfeit')) return 'var(--s-bad)';
-  return 'var(--s-grey)';
+  if(k.startsWith('conf')||k.startsWith('sched')||k.startsWith('play')) return 'ok';
+  if(k.startsWith('post')) return 'warn';
+  if(k.startsWith('canc')||k.includes('forfeit')) return 'bad';
+  return '';
 }
 function shortTeam(t){
   const u = (t.match(/U\s?\d+/i)||[''])[0].replace(/\s/g,'').toUpperCase();
@@ -271,6 +317,10 @@ function shortTeam(t){
   const sfx = (t.match(/-\s*(\w+)\s*$/)||['',''])[1];
   const s = sfx ? u+sfx : u+g+dv;                    // "U15M2", "U13A1"
   return s.length > 2 ? s : t.slice(0,6);
+}
+function mapsQuery(place){
+  const p = (state.data.placeList || []).find(x => x.name.toLowerCase() === (place||'').toLowerCase());
+  return (p && p.address) || state.data.places[(place||'').toLowerCase()] || (place + ', Ireland');
 }
 
 // ---- load ----
@@ -292,12 +342,11 @@ async function load(silent){
 }
 function updateSub(){
   if(!state.data) return;
-  $('sub').textContent = state.data.matches.length + ' matches · updated ' + state.data.loadedAt + (state.pin ? ' · Admin mode' : '');
+  $('sub').textContent = '· ' + state.data.loadedAt + (state.pin ? ' · Admin' : '');
 }
-
 function showGate(club){
   $('club').textContent = club + ' Fixtures';
-  $('sub').textContent = 'Access code required';
+  $('sub').textContent = '';
   $('controls').style.display = 'none'; $('tabs').style.display = 'none';
   $('list').innerHTML = '<div class="gate"><p>Enter the team managers’ access code to view fixtures.</p>'+
     '<input id="gateInput" type="password" autocomplete="off" placeholder="Access code">'+
@@ -313,9 +362,7 @@ function showGate(club){
 }
 
 // ---- filtering ----
-function teamFiltered(){
-  return state.data.matches.filter(m => !state.team || m.ourTeam === state.team);
-}
+function teamFiltered(){ return state.data.matches.filter(m => !state.team || m.ourTeam === state.team); }
 function viewRows(){
   const today = todayISO(), q = state.q.toLowerCase();
   return teamFiltered().filter(m => {
@@ -339,58 +386,58 @@ function renderChips(){
   });
 }
 function render(){
-  const stats = state.view === 'stats';
-  $('listControls').style.display = stats ? 'none' : '';
-  $('legend').style.display = stats ? 'none' : '';
-  if(stats) return renderStats();
+  const v = state.view, fixtures = ['upcoming','past','all'].includes(v);
+  $('listControls').style.display = fixtures ? '' : 'none';
+  $('legend').style.display = fixtures ? '' : 'none';
+  $('chips').style.display = v === 'places' ? 'none' : '';
+  $('fab').textContent = v === 'places' ? '+ Add location' : '+ Add match';
+  if(v === 'stats') return renderStats();
+  if(v === 'places') return renderPlaces();
   if(state.mode === 'cal') return renderCalendar();
   renderList();
 }
 
-// ---- card ----
-function cardHTML(m){
-  const s = side(m), conf = isConfirmed(m), r = res(m);
-  const vPill = s==='home' ? '<span class="pill" style="background:var(--home)">Home</span>'
-              : s==='away' ? '<span class="pill" style="background:var(--away)">Away</span>'
-              : m.venue ? '<span class="pill" style="background:var(--s-grey)">'+esc(m.venue)+'</span>' : '';
-  const sPill = m.status ? '<span class="pill'+(conf?'':' outline')+'" style="'+(conf?'background:':'color:')+statusColor(m.status)+'">'+esc(m.status)+'</span>' : '';
-  const fixture = (m.homeTeam && m.awayTeam)
-    ? esc(m.homeTeam)+' <span>v</span> '+esc(m.awayTeam)
-    : esc(m.ourTeam)+' <span>v</span> '+esc(m.opponent);
+// ---- compact row ----
+function rowHTML(m){
+  const s = side(m), conf = isConfirmed(m), r = res(m), today = todayISO();
+  const date = isISO(m.date) ? shortDate(m.date) : (m.dateNote || 'TBC');
   const pk = (m.place||'').toLowerCase();
+  const at = m.place && pk !== 'internal' ? ' <span class="at">@ '+esc(m.place)+'</span>' : '';
+  const tag = state.team ? '' : '<span class="tag">'+esc(shortTeam(m.ourTeam))+'</span>';
+  let right = '';
+  if(r) right = '<span class="res '+r+'">'+r+(m.score?' '+esc(m.score):'')+'</span>';
+  else if(isCancelled(m)) right = '<span class="st '+statusClass(m.status)+'">'+esc(m.status)+'</span>';
+  else if(conf) right = '<span class="st ok" title="'+esc(m.status)+'">✓</span>';
+
   let loc = '';
   if(NO_MAP.indexOf(pk) < 0){
-    const q = state.data.places[pk] || (m.place + ', Ireland');
-    loc = '<a class="loc" target="_blank" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q)+'">📍 '+esc(m.place)+'</a>';
-  } else if(pk === 'tbc') loc = '<span>📍 Location TBC</span>';
-  const rBadge = r ? '<span class="res '+r+'">'+({W:'Won',L:'Lost',D:'Draw'})[r]+(m.score?' '+esc(m.score):'')+'</span>' : '';
-  return '<div class="card '+s+(conf?'':' tbc')+(isCancelled(m)?' cancel':'')+(state.pin?' edit':'')+'" data-row="'+m.row+'">'+
-    '<div class="time">'+(esc(m.time)||'TBC')+'</div>'+
-    '<div class="body"><div class="team">'+esc(m.ourTeam)+'</div>'+
-    '<div class="vs">'+fixture+'</div>'+
-    '<div class="meta">'+rBadge+vPill+sPill+loc+'</div></div></div>';
+    loc = '<a target="_blank" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(mapsQuery(m.place))+'">📍 '+esc(m.place)+' – open in Maps</a>';
+  } else loc = '📍 ' + (pk === 'internal' ? 'Internal' : 'Location TBC');
+  const fixture = (m.homeTeam && m.awayTeam) ? esc(m.homeTeam)+' v '+esc(m.awayTeam) : esc(m.ourTeam)+' v '+esc(m.opponent);
+  const details =
+    '<div><b>'+fixture+'</b></div>'+
+    '<div>'+(isISO(m.date) ? dayLabel(m.date) : esc(m.dateNote||'Date TBC'))+(m.time?' · '+esc(m.time):'')+
+      ' · '+(s==='home'?'Home':s==='away'?'Away':esc(m.venue||'—'))+' · '+esc(m.status||'—')+'</div>'+
+    (r ? '<div>Result: <b>'+({W:'Won',L:'Lost',D:'Draw'})[r]+(m.score?' '+esc(m.score):'')+'</b></div>' : '')+
+    '<div>'+loc+'</div>'+
+    (state.pin ? '<button class="editbtn" data-edit="'+m.row+'">Edit match</button>' : '');
+
+  return '<div class="m '+s+(conf?'':' tbc')+(isCancelled(m)?' cancel':'')+(state.open[m.row]?' open':'')+'" data-row="'+m.row+'">'+
+    '<div class="r1"><span class="dt'+(m.date===today?' today':'')+'">'+esc(date)+'</span>'+
+    '<span class="tm">'+(esc(m.time)||'–')+'</span>'+
+    '<span class="ha '+s+'">'+(s==='home'?'H':s==='away'?'A':'N')+'</span>'+
+    '<span class="who">'+tag+'<span class="opp">'+esc(m.opponent)+'</span>'+at+'</span>'+
+    '<span class="rt">'+right+'</span></div>'+
+    '<div class="r2">'+details+'</div></div>';
 }
-function wireCards(root){
-  if(!state.pin) return;
-  root.querySelectorAll('.card').forEach(c => c.onclick = e => {
+function wireRows(root){
+  root.querySelectorAll('.m').forEach(el => el.onclick = e => {
     if(e.target.closest('a')) return;
-    openForm(state.data.matches.find(m => String(m.row) === c.dataset.row));
+    const eb = e.target.closest('[data-edit]');
+    if(eb){ openForm(state.data.matches.find(m => String(m.row) === eb.dataset.edit)); return; }
+    el.classList.toggle('open');
+    state.open[el.dataset.row] = el.classList.contains('open');
   });
-}
-function groupedList(rows, reverse){
-  rows = rows.slice().sort(byKey); if(reverse) rows.reverse();
-  const today = todayISO();
-  let html = '', last = null;
-  rows.forEach(m => {
-    const d = isISO(m.date) ? m.date : 'note:' + (m.dateNote||'').toLowerCase();
-    if(d !== last){
-      const label = isISO(m.date) ? dayLabel(m.date) : (/^internal$/i.test(m.dateNote) ? 'Internal matches' : 'Date to be confirmed');
-      html += '<div class="day">'+esc(label)+(m.date===today?'<span class="today">· Today</span>':'')+'</div>';
-      last = d;
-    }
-    html += cardHTML(m);
-  });
-  return html;
 }
 function emptyMsg(){
   return '<div class="empty">No '+(state.view==='past'?'results':'matches')+' to show'+(state.team?' for '+esc(state.team):'')+'.</div>';
@@ -398,9 +445,10 @@ function emptyMsg(){
 
 // ---- list view ----
 function renderList(){
-  const rows = viewRows();
-  $('list').innerHTML = rows.length ? groupedList(rows, state.view==='past') : emptyMsg();
-  wireCards($('list'));
+  let rows = viewRows().sort(byKey);
+  if(state.view==='past') rows.reverse();
+  $('list').innerHTML = rows.length ? '<div style="height:6px"></div>' + rows.map(rowHTML).join('') : emptyMsg();
+  wireRows($('list'));
 }
 
 // ---- calendar view ----
@@ -436,36 +484,30 @@ function renderCalendar(){
       const s = side(m);
       const tip = m.ourTeam+' v '+m.opponent+(m.time?' · '+m.time:'')+' · '+(s==='home'?'Home':s==='away'?'Away':m.venue||'')+' · '+(m.status||'');
       return '<div class="mc '+s+(isConfirmed(m)?'':' tbc')+(isCancelled(m)?' cancel':'')+'" title="'+esc(tip)+'">'+esc(shortTeam(m.ourTeam))+'</div>';
-    }).join('') + (ms.length > 3 ? '<div class="more">+'+(ms.length-3)+' more</div>' : '');
+    }).join('') + (ms.length > 3 ? '<div class="more">+'+(ms.length-3)+'</div>' : '');
     g += '<div class="cell'+(inMonth?'':' out')+(key===today?' today':'')+(key===state.calDay?' sel':'')+'" data-day="'+(inMonth?key:'')+'">'+
          (inMonth?'<span class="dn">'+d.getDate()+'</span>':'')+chips+'</div>';
   }
-
-  // matches listed under the grid: selected day, else the whole month
-  const monthRows = rows.filter(m => isISO(m.date) && m.date.slice(0,7) === state.calMonth);
+  const monthRows = rows.filter(m => isISO(m.date) && m.date.slice(0,7) === state.calMonth).sort(byKey);
   const below = state.calDay ? (byDay[state.calDay] || []) : monthRows;
-  const undated = rows.filter(m => !isISO(m.date));
+  const undated = rows.filter(m => !isISO(m.date)).sort(byKey);
   let html = '<div class="cal"><div class="cal-head">'+
     '<button class="cal-nav" id="calPrev" aria-label="Previous month">‹</button><b>'+esc(title)+'</b>'+
     '<button class="cal-nav" id="calNext" aria-label="Next month">›</button></div>'+
     '<div class="grid7">'+g+'</div></div>';
-  if(state.calDay){
-    html += '<div class="day">'+esc(dayLabel(state.calDay))+' · <a href="#" id="calAll" style="color:var(--brand)">show whole month</a></div>';
-    html += below.length ? below.map(cardHTML).join('') : '<div class="empty">No matches this day.</div>';
-  } else {
-    html += monthRows.length ? groupedList(monthRows, false) : '<div class="empty">No matches in '+esc(title)+'.</div>';
-  }
+  html += '<div class="day">'+(state.calDay ? esc(dayLabel(state.calDay))+' · <a href="#" id="calAll" style="color:var(--brand)">whole month</a>' : esc(title))+'</div>';
+  html += below.length ? below.map(rowHTML).join('') : '<div class="empty" style="padding:12px">No matches.</div>';
   if(undated.length && state.view !== 'past'){
-    html += '<div class="day">No date yet ('+undated.length+')</div>' + undated.sort(byKey).map(cardHTML).join('');
+    html += '<div class="day">No date yet ('+undated.length+')</div>' + undated.map(rowHTML).join('');
   }
   $('list').innerHTML = html;
-  wireCards($('list'));
+  wireRows($('list'));
 
   const shift = n => { const d = new Date(Y, M-1+n, 1); state.calMonth = iso(d).slice(0,7); state.calDay = null; renderCalendar(); };
   $('calPrev').onclick = () => shift(-1);
   $('calNext').onclick = () => shift(1);
   if($('calAll')) $('calAll').onclick = e => { e.preventDefault(); state.calDay = null; renderCalendar(); };
-  $('list').querySelectorAll('.cell[data-day]').forEach(c => { if(c.dataset.day) c.onclick = () => {
+  $('list').querySelectorAll('.cell').forEach(c => { if(c.dataset.day) c.onclick = () => {
     state.calDay = state.calDay === c.dataset.day ? null : c.dataset.day; renderCalendar();
   }; });
 }
@@ -482,31 +524,27 @@ function stackHTML(t){
   const seg = (k, n, name) => n ? '<div class="'+k+'" style="flex:'+n+'" title="'+name+': '+n+'">'+(n/t.P >= .12 ? n : '')+'</div>' : '';
   return '<div class="stack">'+seg('W',t.W,'Won')+seg('L',t.L,'Lost')+seg('D',t.D,'Draw')+'</div>';
 }
+function tile(k, v){ return '<div class="tile"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'; }
+function srow(label, t){
+  return '<div class="srow"><span class="lbl">'+label+'</span>'+stackHTML(t)+'<span class="num">'+t.W+'W '+t.L+'L'+(t.D?' '+t.D+'D':'')+'</span></div>';
+}
 function renderStats(){
   const all = teamFiltered();
   const played = all.filter(m => res(m));
   const t = tally(played);
   const remaining = all.filter(m => !res(m) && !isCancelled(m));
-  const remConf = remaining.filter(isConfirmed).length;
+  const remConf = remaining.filter(isConfirmed).length, remT = remaining.length - remConf;
   const home = tally(played.filter(m => side(m)==='home'));
   const away = tally(played.filter(m => side(m)==='away'));
   const scope = state.team ? esc(state.team) : 'All teams';
 
-  let html = '<div class="tiles">'+
-    tile('Played', t.P) + tile('Won', t.W) + tile('Lost', t.L) + tile('Drawn', t.D) +
-    tile('Win rate', t.pct === null ? '–' : t.pct + '<small>%</small>') + '</div>';
-
+  let html = '<div class="tiles">'+tile('Played', t.P)+tile('Won', t.W)+tile('Lost', t.L)+tile('Drawn', t.D)+
+    tile('Win %', t.pct === null ? '–' : t.pct + '<small>%</small>')+'</div>';
   html += '<div class="panel"><h3>Wins vs losses · '+scope+'</h3>'+
-    (t.P ? stackHTML(t) : '<div class="empty" style="padding:16px">No results yet. Admins can add a result by tapping a match.</div>')+
-    (t.P ? '<div class="slegend"><span><i style="background:var(--win)"></i>Won '+t.W+'</span><span><i style="background:var(--loss)"></i>Lost '+t.L+'</span><span><i style="background:var(--draw)"></i>Draw '+t.D+'</span></div>' : '')+
-    '</div>';
+    (t.P ? stackHTML(t)+'<div class="slegend"><span><i style="background:var(--win)"></i>Won '+t.W+'</span><span><i style="background:var(--loss)"></i>Lost '+t.L+'</span><span><i style="background:var(--draw)"></i>Draw '+t.D+'</span></div>'
+         : '<div class="empty" style="padding:12px">No results yet. Admins add a result from a match’s Edit button.</div>')+'</div>';
+  if(t.P) html += '<div class="panel"><h3>Home vs away</h3>'+srow('Home', home)+srow('Away', away)+'</div>';
 
-  if(t.P){
-    html += '<div class="panel"><h3>Home vs away</h3>'+
-      srow('Home', home) + srow('Away', away) + '</div>';
-  }
-
-  // by team
   const teams = state.team ? [state.team] : state.data.teams;
   let rowsHTML = '';
   teams.forEach(team => {
@@ -522,35 +560,111 @@ function renderStats(){
   });
   html += '<div class="panel"><h3>By team</h3><table class="tt"><thead><tr><th>Team</th><th class="n">P</th><th class="n">W</th><th class="n">L</th>'+
     '<th class="n hide-sm">D</th><th class="n">Win%</th><th class="hide-sm">Last 5</th><th class="n">Left</th></tr></thead><tbody>'+rowsHTML+'</tbody></table></div>';
-
-  // fixtures still to play
-  const remT = remaining.length - remConf;
   html += '<div class="panel"><h3>Fixtures still to play · '+remaining.length+'</h3>'+
     (remaining.length ? '<div class="stack">'+
       (remConf ? '<div class="C" style="flex:'+remConf+'" title="Confirmed: '+remConf+'">'+(remConf/remaining.length>=.12?remConf:'')+'</div>' : '')+
       (remT ? '<div class="T" style="flex:'+remT+'" title="TBC / not scheduled: '+remT+'">'+(remT/remaining.length>=.12?remT:'')+'</div>' : '')+'</div>'+
       '<div class="slegend"><span><i style="background:var(--s-ok)"></i>Confirmed '+remConf+'</span><span><i style="border:1.5px dashed var(--muted)"></i>TBC / not scheduled '+remT+'</span></div>'
-      : '<div class="empty" style="padding:16px">All fixtures played.</div>')+'</div>';
-
+      : '<div class="empty" style="padding:12px">All fixtures played.</div>')+'</div>';
   $('list').innerHTML = html;
 }
-function tile(k, v){ return '<div class="tile"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>'; }
-function srow(label, t){
-  return '<div class="srow"><span class="lbl">'+label+'</span>'+stackHTML(t)+'<span class="num">'+t.W+'W '+t.L+'L'+(t.D?' '+t.D+'D':'')+'</span></div>';
-}
 
-// ---- admin ----
-function setAdmin(pin){
+// ---- locations (admin only) ----
+function placeUsage(){
+  const c = {};
+  state.data.matches.forEach(m => { const k=(m.place||'').toLowerCase(); if(k) c[k]=(c[k]||0)+1; });
+  return c;
+}
+function renderPlaces(){
+  if(!state.pin){ state.view = 'upcoming'; setTab(); return render(); }
+  const use = placeUsage();
+  const list = (state.data.placeList || []).slice().sort((a,b) => a.name.localeCompare(b.name));
+  const known = new Set(list.map(p => p.name.toLowerCase()));
+  const unlisted = Object.keys(use).filter(k => !known.has(k) && NO_MAP.indexOf(k) < 0);
+  let html = '<div class="hint">Locations used in fixtures. Add an address or Eircode so the 📍 link opens the right hall. '+
+             'Tap one to edit; renaming can fix a spelling in every match at once.</div>';
+  html += list.map(p => {
+    const n = use[p.name.toLowerCase()] || 0;
+    return '<div class="loc" data-name="'+esc(p.name)+'"><div class="grow"><div class="nm">'+esc(p.name)+'</div>'+
+      '<div class="ad'+(p.address?'':' missing')+'">'+(p.address ? esc(p.address) : 'No address yet')+'</div></div>'+
+      '<div class="cnt">'+n+' match'+(n===1?'':'es')+'</div></div>';
+  }).join('') || '<div class="empty">No locations yet. Tap + Add location.</div>';
+  if(unlisted.length){
+    html += '<div class="day">In fixtures but not in this list</div>' + unlisted.map(k => {
+      const name = (state.data.matches.find(m => (m.place||'').toLowerCase() === k) || {}).place || k;
+      return '<div class="loc" data-new="'+esc(name)+'"><div class="grow"><div class="nm">'+esc(name)+'</div>'+
+        '<div class="ad missing">Tap to add it</div></div><div class="cnt">'+use[k]+' match'+(use[k]===1?'':'es')+'</div></div>';
+    }).join('');
+  }
+  $('list').innerHTML = html;
+  $('list').querySelectorAll('.loc').forEach(el => el.onclick = () => {
+    if(el.dataset.new) openPlace(null, el.dataset.new);
+    else openPlace((state.data.placeList||[]).find(p => p.name === el.dataset.name));
+  });
+}
+function openPlace(p, presetName){
+  state.editPlace = p || null;
+  $('placeTitle').textContent = p ? 'Edit location' : 'Add location';
+  $('p_name').value = p ? p.name : (presetName || '');
+  $('p_addr').value = p ? p.address : '';
+  $('pDel').style.display = p ? '' : 'none';
+  const n = p ? (placeUsage()[p.name.toLowerCase()] || 0) : 0;
+  $('p_renameWrap').style.display = 'none';
+  $('p_renameTxt').textContent = 'Also rename it in '+n+' match'+(n===1?'':'es');
+  $('p_renameWrap').dataset.count = n;
+  $('placeErr').textContent = '';
+  updateMapTest();
+  $('placeOverlay').classList.add('show');
+  setTimeout(() => (p ? $('p_addr') : $('p_name')).focus(), 50);
+}
+function updateMapTest(){
+  const q = $('p_addr').value.trim() || ($('p_name').value.trim() + ', Ireland');
+  $('p_test').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
+  const p = state.editPlace;
+  const renamed = p && $('p_name').value.trim().toLowerCase() !== p.name.toLowerCase() && Number($('p_renameWrap').dataset.count) > 0;
+  $('p_renameWrap').style.display = renamed ? '' : 'none';
+}
+$('p_name').addEventListener('input', updateMapTest);
+$('p_addr').addEventListener('input', updateMapTest);
+$('pCancel').onclick = () => $('placeOverlay').classList.remove('show');
+$('pSave').onclick = async () => {
+  const name = $('p_name').value.trim();
+  if(!name){ $('placeErr').textContent = 'Name is required.'; return; }
+  $('pSave').disabled = true; $('placeErr').textContent = 'Saving…';
+  try{
+    const p = state.editPlace;
+    state.data = await call('savePlace', state.pin, p ? p.name : '', name, $('p_addr').value.trim(),
+      $('p_renameWrap').style.display !== 'none' && $('p_rename').checked);
+    $('placeOverlay').classList.remove('show'); render(); toast('Location saved');
+  }catch(err){ $('placeErr').textContent = err.message || err; }
+  $('pSave').disabled = false;
+};
+$('pDel').onclick = async () => {
+  const p = state.editPlace; if(!p) return;
+  if(!confirm('Remove '+p.name+' from the locations list? Matches keep their location text.')) return;
+  $('placeErr').textContent = 'Deleting…';
+  try{
+    state.data = await call('deletePlace', state.pin, p.name);
+    $('placeOverlay').classList.remove('show'); render(); toast('Location removed');
+  }catch(err){ $('placeErr').textContent = err.message || err; }
+};
+
+// ---- admin login ----
+function setAdmin(pin, remember){
   state.pin = pin;
-  if(pin) store.set('adminPin', pin, true); else store.del('adminPin', true);
+  store.del('adminPin', true); store.del('adminPin');
+  if(pin) store.set('adminPin', pin, !remember);
+  document.body.classList.toggle('admin', !!pin);
   $('adminBtn').classList.toggle('on', !!pin);
   $('adminBtn').textContent = pin ? 'Admin ✓' : '🔒';
+  $('adminBtn').title = pin ? 'Sign out of admin' : 'Admin login';
   $('fab').classList.toggle('show', !!pin);
+  if(!pin && state.view === 'places'){ state.view = 'upcoming'; setTab(); }
   if(state.data){ updateSub(); render(); }
 }
 $('adminBtn').onclick = () => {
-  if(state.pin){ setAdmin(''); toast('Admin mode off'); return; }
-  $('pinInput').value=''; $('pinErr').textContent='';
+  if(state.pin){ if(confirm('Sign out of admin?')){ setAdmin(''); toast('Signed out'); } return; }
+  $('pinInput').value=''; $('pinErr').textContent=''; $('pinRemember').checked = false;
   $('pinOverlay').classList.add('show'); setTimeout(()=>$('pinInput').focus(),50);
 };
 $('pinCancel').onclick = () => $('pinOverlay').classList.remove('show');
@@ -559,13 +673,14 @@ $('pinOk').onclick = async () => {
   $('pinOk').disabled = true; $('pinErr').textContent = 'Checking…';
   try{
     const ok = await call('verifyAdmin', pin);
-    if(ok){ $('pinOverlay').classList.remove('show'); setAdmin(pin); toast('Admin mode on – tap a match to edit'); }
-    else $('pinErr').textContent = 'PIN not recognised.';
+    if(ok){ $('pinOverlay').classList.remove('show'); setAdmin(pin, $('pinRemember').checked); toast('Signed in – tap a match, then Edit'); }
+    else $('pinErr').textContent = 'Password not recognised.';
   }catch(e){ $('pinErr').textContent = e.message || e; }
   $('pinOk').disabled = false;
 };
 $('pinInput').onkeydown = e => { if(e.key==='Enter') $('pinOk').click(); };
 
+// ---- match form ----
 function openForm(m){
   state.editing = m || null;
   $('formTitle').textContent = m ? 'Edit match' : 'Add match';
@@ -573,8 +688,8 @@ function openForm(m){
   $('formErr').textContent = '';
   $('f_status').innerHTML = state.data.statuses.map(s => '<option>'+esc(s)+'</option>').join('');
   $('teamList').innerHTML = state.data.teams.map(t => '<option value="'+esc(t)+'">').join('');
-  const places = [...new Set(state.data.matches.map(x => x.place).filter(Boolean))].sort();
-  $('placeList').innerHTML = places.map(p => '<option value="'+esc(p)+'">').join('');
+  const places = [...new Set([...(state.data.placeList||[]).map(p => p.name), ...state.data.matches.map(x => x.place)].filter(Boolean))].sort();
+  $('placeDL').innerHTML = places.map(p => '<option value="'+esc(p)+'">').join('');
   const blank = { ourTeam: state.team || '', status: state.data.statuses[0] || '' };
   FIELDS.forEach(f => {
     const el = $('f_'+f), v = (m || blank)[f] || '';
@@ -602,8 +717,7 @@ $('f_result').addEventListener('change', () => {
   const played = state.data.statuses.find(s => /^play/i.test(s));
   if($('f_result').value && played) $('f_status').value = played;
 });
-
-$('fab').onclick = () => openForm(null);
+$('fab').onclick = () => state.view === 'places' ? openPlace(null) : openForm(null);
 $('formCancel').onclick = () => $('formOverlay').classList.remove('show');
 $('saveBtn').onclick = async () => {
   const match = {}; FIELDS.forEach(f => match[f] = $('f_'+f).value.trim());
@@ -627,9 +741,9 @@ $('delBtn').onclick = async () => {
 };
 
 // ---- wiring ----
+function setTab(){ document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.dataset.view === state.view)); }
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
-  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
-  t.classList.add('on'); state.view = t.dataset.view; state.calMonth = null; state.calDay = null;
+  state.view = t.dataset.view; state.calMonth = null; state.calDay = null; setTab();
   if(state.data) render();
 });
 document.querySelectorAll('#mode button').forEach(b => b.onclick = () => {
@@ -639,13 +753,15 @@ document.querySelectorAll('#mode button').forEach(b => b.onclick = () => {
 });
 $('search').oninput = e => { state.q = e.target.value; if(state.data) render(); };
 $('refreshBtn').onclick = () => load();
-[$('pinOverlay'), $('formOverlay')].forEach(o => o.addEventListener('click', e => { if(e.target === o) o.classList.remove('show'); }));
+[$('pinOverlay'), $('formOverlay'), $('placeOverlay')].forEach(o => o.addEventListener('click', e => { if(e.target === o) o.classList.remove('show'); }));
 
 state.team = store.get('myTeam');
 if(store.get('viewMode') === 'cal'){ state.mode = 'cal'; document.querySelectorAll('#mode button').forEach(x => x.classList.toggle('on', x.dataset.mode==='cal')); }
-const savedPin = store.get('adminPin', true);
-if(savedPin) setAdmin(savedPin);
-load();
+const savedPin = store.get('adminPin', true) || store.get('adminPin');
+if(savedPin) setAdmin(savedPin, !!store.get('adminPin'));
+load().then(() => {                       // a remembered password that's since been changed signs you out
+  if(state.pin) call('verifyAdmin', state.pin).then(ok => { if(!ok){ setAdmin(''); toast('Admin password changed – please sign in again'); } }).catch(()=>{});
+});
 </script>
 </body>
 </html>

@@ -31,16 +31,16 @@ sheet menu **Fixtures App → Split time into Time + Location columns**. It adds
 moves the place names into it, leaves clean times, and turns date text into real dates.
 It's safe to run again. Until you run it, the app still reads the old format correctly.
 
-**Places tab** (created automatically, pre-filled with every location found): add an address or
-Eircode next to each place so the 📍 link opens the exact hall in Google Maps. Without one, the link
-searches "<place>, Ireland".
+**Places tab** (created automatically, pre-filled with every location found): holds an address or
+Eircode for each place so the 📍 link opens the exact hall in Google Maps. Without one, the link
+searches "<place>, Ireland". Admins normally manage this from the app's **Locations** tab instead.
 
 **Settings tab** (created automatically):
 
 | Setting | What it does |
 |---|---|
 | Club Name | Title at the top of the app |
-| Admin PINs | Comma-separated, one per admin. Blank = no editing in the app |
+| Admin Passwords | One per admin, comma-separated (letters/numbers, case-sensitive). Blank = no editing in the app |
 | Viewer Code | Optional code managers enter once. Blank = anyone with the link can view |
 | Statuses | Options in the status dropdown |
 
@@ -95,11 +95,18 @@ Both functions are also in the sheet's **Fixtures App** menu.
 - **Stats**: played / won / lost / drawn / win rate, wins-vs-losses bar, home vs away record,
   a per-team table with last-5 form, and how many remaining fixtures are confirmed vs TBC.
   Follows the team filter.
-- **Admins**: tap 🔒, enter PIN → tap any match to edit or delete, **+ Add match** to create.
+- **Compact list**: one line per match (date, time, H/A, opponent @ location, result or ✓ when confirmed),
+  so a team's full season fits on one phone screen. Tap a match for full details and the Maps link.
+- **Admins**: tap 🔒 and sign in with an admin password (tick *Keep me signed in* on your own phone).
+  Tap a match → **Edit match** to change or delete it; **+ Add match** to create one.
   Choosing Home/Away auto-fills Home Team / Away Team, and Home pre-fills your usual home location.
   Use the date picker, or pick TBC / Internal when there's no date yet.
   Enter the Result and Score after a match; picking a result sets Status to Played.
   A match with a result moves to the Results tab and counts in Stats.
+- **Locations tab (admins only)**: every location with its address and how many matches use it.
+  **+ Add location** to create one; tap one to set its address or rename it (renaming can also fix the
+  name in every match, e.g. Knocklyn → Knocklyon). Places used in fixtures but missing from the list
+  are shown underneath so you can add them in one tap.
 - Edits write straight into the sheet; admins can also keep editing the sheet directly.
 - If someone changed a row in the sheet after the app loaded, the save is blocked with
   "refresh and try again", so nobody overwrites anyone else's change.
@@ -118,5 +125,6 @@ Both functions are also in the sheet's **Fixtures App** menu.
 ## Security notes
 
 - The script runs as the sheet owner, so **don't share the sheet itself** with managers — just the app link.
-- PINs are checked on the server for every edit; a wrong PIN adds a delay to slow guessing.
-- PIN/link security is fine for fixtures; it isn't bank-grade. Change PINs in Settings anytime.
+- Passwords are checked on the server for every edit; a wrong one adds a delay to slow guessing.
+- Changing or removing a password in Settings signs that admin out on their next visit.
+- Password/link security is fine for fixtures; it isn't bank-grade.

@@ -34,7 +34,7 @@ const TEXT_FIELDS = ['ourTeam', 'opponent', 'venue', 'homeTeam', 'awayTeam', 'st
 
 const DEFAULT_SETTINGS = [
   ['Club Name', 'My Club', 'Shown at the top of the app'],
-  ['Admin PINs', '', 'Comma-separated, one per admin (e.g. 4821, 7730). Blank = editing disabled'],
+  ['Admin Passwords', '', 'One per admin, separated by commas (letters/numbers, e.g. Shuttle24, Smash99). Case-sensitive. Blank = editing disabled'],
   ['Viewer Code', '', 'Optional code managers enter once to view. Blank = anyone with the link'],
   ['Statuses', 'Not Scheduled, Scheduled, Confirmed, Postponed, Cancelled, Played', 'Options in the status dropdown']
 ];
@@ -156,6 +156,7 @@ function payload_(s) {
     statuses: statuses,
     teams: teams,
     places: readPlaces_(),
+    placeList: readPlaceList_(),
     matches: matches,
     loadedAt: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm')
   };
@@ -306,6 +307,81 @@ function ensureResultColumns_() {
 
 /* ---------------- Places (for Google Maps links) ---------------- */
 
+function readPlaceList_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(PLACES_SHEET);
+  if (!sh) return [];
+  return sh.getDataRange().getDisplayValues().slice(1)
+    .map((r, i) => ({ name: String(r[0]).trim(), address: String(r[1]).trim(), row: i + 2 }))
+    .filter(p => p.name);
+}
+
+/**
+ * Adds or edits a location in the Places tab. If an existing location is renamed and
+ * renameMatches is true, matches using the old name are updated too.
+ */
+function savePlace(pin, original, name, address, renameMatches) {
+  assertAdmin_(pin);
+  name = String(name || '').trim().slice(0, 100);
+  address = String(address || '').trim().slice(0, 300);
+  original = String(original || '').trim();
+  if (!name) throw new Error('Location name is required.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    ensurePlaces_();
+    const sh = SpreadsheetApp.getActive().getSheetByName(PLACES_SHEET);
+    const list = readPlaceList_();
+    const lower = name.toLowerCase(), origLower = original.toLowerCase();
+    if (list.some(p => p.name.toLowerCase() === lower && p.name.toLowerCase() !== origLower)) {
+      throw new Error('There is already a location called "' + name + '".');
+    }
+    const existing = original ? list.find(p => p.name.toLowerCase() === origLower) : null;
+    if (existing) sh.getRange(existing.row, 1, 1, 2).setValues([[name, address]]);
+    else sh.appendRow([name, address]);
+
+    if (existing && renameMatches && origLower !== lower) renamePlaceInMatches_(origLower, name);
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+  return payload_(getSettings_());
+}
+
+function deletePlace(pin, name) {
+  assertAdmin_(pin);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = SpreadsheetApp.getActive().getSheetByName(PLACES_SHEET);
+    const p = readPlaceList_().find(x => x.name.toLowerCase() === String(name || '').trim().toLowerCase());
+    if (!p) throw new Error('That location no longer exists. Tap refresh.');
+    sh.deleteRow(p.row);
+  } finally {
+    lock.releaseLock();
+  }
+  return payload_(getSettings_());
+}
+
+function renamePlaceInMatches_(oldLower, newName) {
+  const sh = getMatchesSheet_();
+  const lastCol = sh.getLastColumn();
+  const map = headerMap_(sh.getRange(1, 1, 1, lastCol).getValues()[0]);
+  const n = lastDataRow_(sh) - 1;
+  if (n < 1) return;
+  if (map.location !== undefined) {
+    const r = sh.getRange(2, map.location + 1, n, 1);
+    const v = r.getDisplayValues().map(x => [String(x[0]).trim().toLowerCase() === oldLower ? newName : x[0]]);
+    r.setValues(v);
+  } else if (map.time !== undefined) {               // old "Place @ HH:MM" format
+    const r = sh.getRange(2, map.time + 1, n, 1);
+    const v = r.getDisplayValues().map(x => {
+      const t = splitTimeCell_(x[0]);
+      return [t.place.toLowerCase() === oldLower ? joinTimeCell_(newName, t.time) : x[0]];
+    });
+    r.setNumberFormat('@').setValues(v);
+  }
+}
+
 function readPlaces_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(PLACES_SHEET);
   if (!sh) return {};
@@ -404,6 +480,14 @@ function getMatchesSheet_() {
 function ensureSettings_() {
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(SETTINGS_SHEET);
+  if (sh) {                                         // older sheets: rename "Admin PINs" → "Admin Passwords"
+    const col = sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), 1).getDisplayValues();
+    const i = col.findIndex(r => String(r[0]).trim().toLowerCase() === 'admin pins');
+    if (i >= 0) {
+      sh.getRange(i + 1, 1).setValue('Admin Passwords');
+      sh.getRange(i + 1, 3).setValue(DEFAULT_SETTINGS[1][2]);
+    }
+  }
   if (!sh) {
     sh = ss.insertSheet(SETTINGS_SHEET);
     sh.getRange(1, 1, 1, 3).setValues([['Setting', 'Value', 'Notes']]).setFontWeight('bold');
@@ -421,7 +505,7 @@ function getSettings_() {
   const list = s => (s || '').split(',').map(x => x.trim()).filter(Boolean);
   return {
     clubName: kv['club name'] || 'My Club',
-    adminPins: list(kv['admin pins']),
+    adminPins: list(kv['admin passwords'] || kv['admin pins']),
     viewerCode: kv['viewer code'] || '',
     statuses: list(kv['statuses'] || DEFAULT_SETTINGS[3][1])
   };
@@ -435,7 +519,7 @@ function isAdmin_(pin) {
 }
 
 function assertAdmin_(pin) {
-  if (!isAdmin_(pin)) throw new Error('Admin PIN not recognised.');
+  if (!isAdmin_(pin)) throw new Error('Admin password not recognised.');
 }
 
 function fullYear_(y) { return String(y).length === 2 ? '20' + y : String(y); }
