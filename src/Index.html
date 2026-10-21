@@ -167,7 +167,7 @@
     <h1 id="club">Fixtures</h1>
     <span class="sub" id="sub">Loading…</span>
     <button class="icon-btn" id="refreshBtn" title="Refresh" aria-label="Refresh">⟳</button>
-    <button class="icon-btn" id="adminBtn" title="Admin login" style="display:none">🔒</button>
+    <button class="icon-btn" id="adminBtn" title="Admin login">🔒 Admin</button>
   </div>
   <div class="tabs" id="tabs">
     <button class="tab on" data-view="fixtures">Fixtures</button>
@@ -340,7 +340,6 @@ async function load(silent){
     state.data = r;
     $('club').textContent = r.clubName + ' Fixtures';
     document.title = r.clubName + ' Fixtures';
-    $('adminBtn').style.display = r.adminEnabled ? '' : 'none';
     if(state.team && r.teams.indexOf(state.team) < 0) state.team = '';
     updateSub(); renderChips(); render();
   }catch(e){
@@ -680,7 +679,7 @@ function setAdmin(pin, remember){
   if(pin) store.set('adminPin', pin, !remember);
   document.body.classList.toggle('admin', !!pin);
   $('adminBtn').classList.toggle('on', !!pin);
-  $('adminBtn').textContent = pin ? 'Admin ✓' : '🔒';
+  $('adminBtn').textContent = pin ? 'Admin ✓' : '🔒 Admin';
   $('adminBtn').title = pin ? 'Sign out of admin' : 'Admin login';
   $('fab').classList.toggle('show', !!pin);
   if(!pin && state.view === 'places'){ state.view = 'fixtures'; setTab(); }
@@ -688,7 +687,9 @@ function setAdmin(pin, remember){
 }
 $('adminBtn').onclick = () => {
   if(state.pin){ if(confirm('Sign out of admin?')){ setAdmin(''); toast('Signed out'); } return; }
-  $('pinInput').value=''; $('pinErr').textContent=''; $('pinRemember').checked = false;
+  $('pinInput').value=''; $('pinRemember').checked = false;
+  $('pinErr').textContent = state.data && !state.data.adminEnabled
+    ? 'No admin password is set yet. In the Google Sheet, open the Settings tab and type a password in the Value column next to "Admin Passwords".' : '';
   $('pinOverlay').classList.add('show'); setTimeout(()=>$('pinInput').focus(),50);
 };
 $('pinCancel').onclick = () => $('pinOverlay').classList.remove('show');
