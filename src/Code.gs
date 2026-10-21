@@ -16,6 +16,8 @@
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
 const SETTINGS_SHEET = 'Settings';
 const PLACES_SHEET = 'Places';
+const TEAMS_SHEET = 'Teams';         // Our Team | Division | Manager
+const DIV_SHEET = 'Divisions';       // Division | Team  (every team in each division, ours and opponents)
 
 const FIELDS = [
   { key: 'ourTeam',  header: 'our team' },
@@ -47,6 +49,7 @@ function doGet() {
   ensureSettings_();
   ensurePlaces_();
   ensureResultColumns_();
+  ensureTeamSheets_();
   return HtmlService.createTemplateFromFile('Index')
     .evaluate()
     .setTitle(getSettings_().clubName + ' Fixtures')
@@ -57,7 +60,7 @@ function doGet() {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Fixtures App')
-    .addItem('Set up Settings & Places tabs', 'setup')
+    .addItem('Set up Settings, Places, Teams & Divisions tabs', 'setup')
     .addItem('Split time into Time + Location columns', 'splitIntoSeparateColumns')
     .addToUi();
 }
@@ -68,6 +71,7 @@ function setup() {
   ensureResultColumns_();
   ensureSettings_();
   ensurePlaces_();
+  ensureTeamSheets_();
 }
 
 /* ---------------- Public (client-callable) ---------------- */
@@ -121,6 +125,7 @@ function saveMatch(pin, match, rowNumber, fp) {
     } else {
       set('time', joinTimeCell_(m.place, m.time), '@');
     }
+    addToDivision_(divisionOfTeam_(m.ourTeam), m.opponent);   // new opponents join the division list
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
@@ -149,13 +154,15 @@ function payload_(s) {
   const matches = readMatches_();
   const statuses = s.statuses.slice();
   matches.forEach(m => { if (m.status && statuses.indexOf(m.status) < 0) statuses.push(m.status); });
-  const teams = Array.from(new Set(matches.map(m => m.ourTeam).filter(Boolean))).sort();
+  const teams = Array.from(new Set(matches.map(m => m.ourTeam).concat(readTeamInfo_().map(t => t.team)).filter(Boolean))).sort();
   return {
     clubName: s.clubName,
     statuses: statuses,
     teams: teams,
     places: readPlaces_(),
     placeList: readPlaceList_(),
+    teamInfo: readTeamInfo_(),
+    divisions: readDivisions_(),
     matches: matches,
     loadedAt: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm')
   };
@@ -407,6 +414,147 @@ function ensurePlaces_() {
   const rows = Object.keys(seen).sort().map(k => [seen[k], '']);
   if (rows.length) sh.getRange(2, 1, rows.length, 2).setValues(rows);
   sh.setColumnWidth(1, 160); sh.setColumnWidth(2, 420);
+}
+
+/* ---------------- Teams & divisions ---------------- */
+
+/** "U13 Boys Div 5 - A1" → "U13 Boys Div 5" (first-time guess; admins can change it) */
+function guessDivision_(team) {
+  return String(team).replace(/\s*-\s*[A-Za-z]?\d+\s*$/, '').trim() || team;
+}
+
+/** Creates Teams and Divisions tabs once, pre-filled from the fixtures. */
+function ensureTeamSheets_() {
+  const ss = SpreadsheetApp.getActive();
+  const needTeams = !ss.getSheetByName(TEAMS_SHEET), needDivs = !ss.getSheetByName(DIV_SHEET);
+  if (!needTeams && !needDivs) return;
+  const matches = readMatches_();
+  const ours = Array.from(new Set(matches.map(m => m.ourTeam).filter(Boolean))).sort();
+  if (needTeams) {
+    const sh = ss.insertSheet(TEAMS_SHEET);
+    sh.getRange(1, 1, 1, 3).setValues([['Our Team', 'Division', 'Manager']]).setFontWeight('bold');
+    if (ours.length) sh.getRange(2, 1, ours.length, 3).setValues(ours.map(t => [t, guessDivision_(t), '']));
+    sh.setColumnWidth(1, 200); sh.setColumnWidth(2, 180); sh.setColumnWidth(3, 200);
+    sh.setFrozenRows(1);
+  }
+  if (needDivs) {
+    const divOf = {}; readTeamInfo_().forEach(t => divOf[t.team] = t.division);
+    const seen = {}, rows = [];
+    matches.forEach(m => {
+      const d = divOf[m.ourTeam] || guessDivision_(m.ourTeam);
+      [m.ourTeam, m.opponent].forEach(t => {
+        const k = d + '|' + String(t).toLowerCase();
+        if (t && !seen[k]) { seen[k] = 1; rows.push([d, t]); }
+      });
+    });
+    rows.sort((a, b) => a[0] === b[0] ? a[1].localeCompare(b[1]) : a[0].localeCompare(b[0]));
+    const sh = ss.insertSheet(DIV_SHEET);
+    sh.getRange(1, 1, 1, 2).setValues([['Division', 'Team']]).setFontWeight('bold');
+    if (rows.length) sh.getRange(2, 1, rows.length, 2).setValues(rows);
+    sh.setColumnWidth(1, 180); sh.setColumnWidth(2, 220);
+    sh.setFrozenRows(1);
+  }
+}
+
+function readTeamInfo_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(TEAMS_SHEET);
+  if (!sh) return [];
+  return sh.getDataRange().getDisplayValues().slice(1)
+    .map((r, i) => ({ team: String(r[0]).trim(), division: String(r[1]).trim(), manager: String(r[2] || '').trim(), row: i + 2 }))
+    .filter(t => t.team);
+}
+
+/** { "U15 Mixed Div 2": ["Kadca 1", "Kerela 1", …], … } */
+function readDivisions_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(DIV_SHEET);
+  const out = {};
+  if (!sh) return out;
+  sh.getDataRange().getDisplayValues().slice(1).forEach(r => {
+    const d = String(r[0]).trim(), t = String(r[1]).trim();
+    if (d && t) (out[d] = out[d] || []).push(t);
+  });
+  Object.keys(out).forEach(d => out[d].sort((a, b) => a.localeCompare(b)));
+  return out;
+}
+
+function divisionOfTeam_(team) {
+  const t = readTeamInfo_().find(x => x.team.toLowerCase() === String(team).toLowerCase());
+  return t ? t.division : '';
+}
+
+function addToDivision_(division, team) {
+  division = String(division || '').trim(); team = String(team || '').trim();
+  if (!division || !team) return;
+  const list = readDivisions_()[division] || [];
+  if (list.some(t => t.toLowerCase() === team.toLowerCase())) return;
+  let sh = SpreadsheetApp.getActive().getSheetByName(DIV_SHEET);
+  if (!sh) { ensureTeamSheets_(); sh = SpreadsheetApp.getActive().getSheetByName(DIV_SHEET); }
+  sh.appendRow([division, team]);
+}
+
+/** Add or edit one of our teams (manager, division). */
+function saveTeam(pin, original, team, division, manager) {
+  assertAdmin_(pin);
+  team = String(team || '').trim().slice(0, 100);
+  division = String(division || '').trim().slice(0, 100);
+  manager = String(manager || '').trim().slice(0, 100);
+  original = String(original || '').trim();
+  if (!team) throw new Error('Team name is required.');
+  if (!division) throw new Error('Division is required.');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    ensureTeamSheets_();
+    const sh = SpreadsheetApp.getActive().getSheetByName(TEAMS_SHEET);
+    const list = readTeamInfo_();
+    const key = (original || team).toLowerCase();
+    const existing = list.find(t => t.team.toLowerCase() === key);
+    if (!existing && list.some(t => t.team.toLowerCase() === team.toLowerCase())) {
+      throw new Error('There is already a team called "' + team + '".');
+    }
+    if (existing) sh.getRange(existing.row, 1, 1, 3).setValues([[existing.team, division, manager]]);
+    else sh.appendRow([team, division, manager]);
+    addToDivision_(division, existing ? existing.team : team);
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+  return payload_(getSettings_());
+}
+
+/** Add a team (usually an opponent) to a division. */
+function addDivisionTeam(pin, division, team) {
+  assertAdmin_(pin);
+  team = String(team || '').trim().slice(0, 100);
+  if (!team) throw new Error('Team name is required.');
+  if ((readDivisions_()[division] || []).some(t => t.toLowerCase() === team.toLowerCase())) {
+    throw new Error('"' + team + '" is already in ' + division + '.');
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try { addToDivision_(division, team); SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
+  return payload_(getSettings_());
+}
+
+/** Remove a team from a division list (matches are not changed). */
+function removeDivisionTeam(pin, division, team) {
+  assertAdmin_(pin);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = SpreadsheetApp.getActive().getSheetByName(DIV_SHEET);
+    if (!sh) return payload_(getSettings_());
+    const rows = sh.getDataRange().getDisplayValues();
+    for (let i = rows.length - 1; i >= 1; i--) {
+      if (String(rows[i][0]).trim() === division && String(rows[i][1]).trim().toLowerCase() === String(team).toLowerCase()) {
+        sh.deleteRow(i + 1);
+      }
+    }
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+  return payload_(getSettings_());
 }
 
 /* ---------------- Helpers ---------------- */

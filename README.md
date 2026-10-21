@@ -35,6 +35,15 @@ It's safe to run again. Until you run it, the app still reads the old format cor
 Eircode for each place so the 📍 link opens the exact hall in Google Maps. Without one, the link
 searches "<place>, Ireland". Admins normally manage this from the app's **Locations** tab instead.
 
+**Teams tab** (created automatically, pre-filled from the fixtures): `Our Team | Division | Manager`.
+The manager's name shows under the Team dropdown and in each match's details.
+
+**Divisions tab** (created automatically, pre-filled from the fixtures): `Division | Team`, one row per team in
+each division (ours and opponents). The match form's **Opponent** dropdown lists the teams in our team's division,
+with an *Other…* option; a new opponent typed there is added to the division automatically.
+
+Admins normally manage both from the app: **Admin → Teams & managers**.
+
 **Settings tab** (created automatically):
 
 | Setting | What it does |
@@ -105,7 +114,9 @@ Both functions are also in the sheet's **Fixtures App** menu.
   Use the date picker, or pick TBC / Internal when there's no date yet.
   Enter the Result and Score after a match; picking a result sets Status to Played.
   A match with a result moves into *Results & earlier* and counts in Stats.
-- **Locations tab (admins only)**: every location with its address and how many matches use it.
+- **Admin tab (admins only) → Teams & managers**: one card per division. Tap our team to set its manager or
+  division; **+ Add team** adds an opponent to a division, ✕ removes one; **+ Add our team** creates a new team.
+- **Admin tab → Locations**: every location with its address and how many matches use it.
   **+ Add location** to create one; tap one to set its address or rename it (renaming can also fix the
   name in every match, e.g. Knocklyn → Knocklyon). Places used in fixtures but missing from the list
   are shown underneath so you can add them in one tap.
