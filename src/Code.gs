@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.15.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -650,6 +650,14 @@ function saveOpponent(pin, division, team, manager, phone) {
   return payload_(getSettings_());
 }
 
+/** How many fixtures in a division involve this team (as opponent, or as our team). */
+function fixturesUsingTeam_(division, team) {
+  const k = String(team || '').trim().toLowerCase();
+  const divOf = {}; readTeamInfo_().forEach(t => divOf[t.team.toLowerCase()] = t.division);
+  return readMatches_().filter(m => (divOf[m.ourTeam.toLowerCase()] || guessDivision_(m.ourTeam)) === division &&
+    (m.opponent.toLowerCase() === k || m.ourTeam.toLowerCase() === k)).length;
+}
+
 function divisionOfTeam_(team) {
   const t = readTeamInfo_().find(x => x.team.toLowerCase() === String(team).toLowerCase());
   return t ? t.division : '';
@@ -715,6 +723,11 @@ function addDivisionTeam(pin, division, team) {
 /** Remove a team from a division list (matches are not changed). */
 function removeDivisionTeam(pin, division, team) {
   assertAdmin_(pin);
+  const n = fixturesUsingTeam_(division, team);
+  if (n > 0) {
+    throw new Error('Can\'t remove ' + team + ': ' + n + ' fixture' + (n === 1 ? '' : 's') + ' in ' + division +
+      ' use' + (n === 1 ? 's' : '') + ' it. Change or delete ' + (n === 1 ? 'that match' : 'those matches') + ' first.');
+  }
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {

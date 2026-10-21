@@ -176,6 +176,8 @@
   .mgrs > span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .mgrs > span:first-child{flex:0 0 auto;max-width:45%}
   .mgrs b{color:var(--ink);font-weight:600}
+  .opp-chip .used{min-width:20px;height:20px;border-radius:999px;background:var(--soft);color:var(--muted);font-size:11px;font-weight:700;
+    display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
   .opp-chip button{border:0;background:var(--soft);color:var(--muted);border-radius:999px;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1}
   .opp-add{border:1.5px dashed var(--brand);color:var(--brand);background:transparent;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:600;cursor:pointer}
   .other{margin-top:6px;display:none}
@@ -807,6 +809,12 @@ function adminSeg(){
 function wireAdminSeg(){
   $('aseg').querySelectorAll('button').forEach(b => b.onclick = () => { state.adminSec = b.dataset.sec; render(); });
 }
+// fixtures in a division that involve a team (same rule as the server's removal check)
+function fixturesIn(division, team){
+  const k = (team||'').toLowerCase();
+  return state.data.matches.filter(m => divisionOf(m.ourTeam) === division &&
+    ((m.opponent||'').toLowerCase() === k || (m.ourTeam||'').toLowerCase() === k)).length;
+}
 function renderTeamsAdmin(){
   if(!state.pin){ state.view = 'fixtures'; setTab(); return render(); }
   const info = state.data.teamInfo || [], divs = state.data.divisions || {};
@@ -814,7 +822,8 @@ function renderTeamsAdmin(){
   const names = [...new Set([...Object.keys(divs), ...info.map(t => t.division).filter(Boolean)])].sort();
   const noDiv = state.data.teams.filter(t => !divisionOf(t));
   let html = adminSeg() + '<div class="hint">Each division lists the teams in it. The match form’s Opponent dropdown '+
-    'shows the teams in our team’s division. Tap our team, or an opponent, to add the manager’s name and phone.</div>';
+    'shows the teams in our team’s division. Tap our team, or an opponent, to add the manager’s name and phone. '+
+    'The number on a team shows its fixtures; teams with fixtures can’t be removed.</div>';
   names.forEach(d => {
     const ourHere = info.filter(t => t.division === d);
     const others = (divs[d] || []).filter(t => !ours.has(t.toLowerCase()) && !ourHere.some(o => o.team.toLowerCase() === t.toLowerCase()));
@@ -823,9 +832,11 @@ function renderTeamsAdmin(){
         '<span class="mg'+(t.manager?'':' missing')+'">'+(t.manager ? '👤 '+esc(t.manager)+(t.phone ? ' · 📞' : '') : 'Add manager')+'</span></div>').join('') +
       '<div class="opps">' + others.map(o => {
         const c = (state.data.oppInfo||[]).find(x => x.division === d && x.team.toLowerCase() === o.toLowerCase());
+        const used = fixturesIn(d, o);
         return '<span class="opp-chip"><button class="on" title="Manager & phone" data-odiv="'+esc(d)+'" data-oteam="'+esc(o)+'">'+esc(o)+
           (c ? ' <span class="ph">👤'+(c.phone ? '📞' : '')+'</span>' : '')+'</button>'+
-          '<button title="Remove from division" data-div="'+esc(d)+'" data-rm="'+esc(o)+'">✕</button></span>';
+          (used ? '<span class="used" title="'+used+' fixture'+(used===1?'':'s')+' – can’t be removed">'+used+'</span>'
+                : '<button title="Remove from division" data-div="'+esc(d)+'" data-rm="'+esc(o)+'">✕</button>')+'</span>';
       }).join('') +
       '<button class="opp-add" data-add="'+esc(d)+'">+ Add team</button></div></div>';
   });

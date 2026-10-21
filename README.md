@@ -121,7 +121,8 @@ Both functions are also in the sheet's **Fixtures App** menu.
   Enter the Result and Score after a match; picking a result sets Status to Played.
   A match with a result moves into *Results & earlier* and counts in Stats.
 - **Admin tab (admins only) → Teams & managers**: one card per division. Tap our team to set its manager or
-  division; **+ Add team** adds an opponent to a division, ✕ removes one; **+ Add our team** creates a new team.
+  division; **+ Add team** adds an opponent to a division, ✕ removes one (only teams with no fixtures in that division –
+teams with fixtures show their match count instead, and the server refuses the removal); **+ Add our team** creates a new team.
 - **Admin tab → Locations**: grouped into Home venues and Away venues, each with ✏️ Edit and 🗑 Delete.
   Set a venue's type (🏠 Home / 🚌 Away) in its edit form; you can have more than one home venue.
 - **Team managers** are pre-filled from the club team sheet (only into blank Manager cells).
