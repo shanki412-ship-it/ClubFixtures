@@ -32,7 +32,8 @@ moves the place names into it, leaves clean times, and turns date text into real
 It's safe to run again. Until you run it, the app still reads the old format correctly.
 
 **Places tab** (created automatically, pre-filled with every location found): `Place | Address or Eircode |
-Google Maps link`. With a link, 📍 opens that exact pin; otherwise it searches the address.
+Google Maps link | Type (Home/Away)`. Home venues are offered in the match form's Location dropdown for home
+matches, away venues for away matches. With a link, 📍 opens that exact pin; otherwise it searches the address.
 Celbridge is pre-set to Scoil na Mainistreach, Oldtown Rd, Celbridge, with its map pin.
 **Home matches with no location use Settings → Home Location (Celbridge).** Without one, the link
 searches "<place>, Ireland". Admins normally manage this from the app's **Locations** tab instead.
@@ -118,7 +119,10 @@ Both functions are also in the sheet's **Fixtures App** menu.
   A match with a result moves into *Results & earlier* and counts in Stats.
 - **Admin tab (admins only) → Teams & managers**: one card per division. Tap our team to set its manager or
   division; **+ Add team** adds an opponent to a division, ✕ removes one; **+ Add our team** creates a new team.
-- **Admin tab → Locations**: every location with its address and how many matches use it.
+- **Admin tab → Locations**: grouped into Home venues and Away venues, each with ✏️ Edit and 🗑 Delete.
+  Set a venue's type (🏠 Home / 🚌 Away) in its edit form; you can have more than one home venue.
+- **Team managers** are pre-filled from the club team sheet (only into blank Manager cells).
+- (Locations, continued): every location with its address and how many matches use it.
   **+ Add location** to create one; tap one to set its address or rename it (renaming can also fix the
   name in every match, e.g. Knocklyn → Knocklyon). Places used in fixtures but missing from the list
   are shown underneath so you can add them in one tap.

@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.10.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -50,8 +50,22 @@ const DEFAULT_SETTINGS = [
 const DEFAULT_PLACES = [
   { name: 'Celbridge',
     address: 'Scoil na Mainistreach, Oldtown Rd, Oakleypark, Celbridge, Co. Kildare',
-    link: 'https://maps.app.goo.gl/41RpdT8dCLgGDKfJ9' }
+    link: 'https://maps.app.goo.gl/41RpdT8dCLgGDKfJ9',
+    type: 'Home' }
 ];
+
+// Team managers (from the club's team sheet). Only fills blank Manager cells in the Teams tab.
+const DEFAULT_MANAGERS = {
+  'U13 Boys Div 5 - A1': 'Prashanth',
+  'U13 Boys Div 5 - A2': 'RaviKant',
+  'U15 Mixed Div 2': 'Rishi',
+  'U15 Boys Div 5': 'Shobit',
+  'U15 Boys Div 6': 'Tony',
+  'U17 Mixed Div 1': 'Gaurav',
+  'U17 Mixed Div 2': 'Chandru',
+  'U17 Boys Div 6': 'Shankar',
+  'U19 Mixed Div 1': 'Rajnish'
+};
 
 const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
 
@@ -334,7 +348,8 @@ function readPlaceList_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(PLACES_SHEET);
   if (!sh) return [];
   return sh.getDataRange().getDisplayValues().slice(1)
-    .map((r, i) => ({ name: String(r[0]).trim(), address: String(r[1]).trim(), link: String(r[2] || '').trim(), row: i + 2 }))
+    .map((r, i) => ({ name: String(r[0]).trim(), address: String(r[1]).trim(), link: String(r[2] || '').trim(),
+                      type: /^home/i.test(String(r[3] || '').trim()) ? 'Home' : 'Away', row: i + 2 }))
     .filter(p => p.name);
 }
 
@@ -342,7 +357,8 @@ function readPlaceList_() {
  * Adds or edits a location in the Places tab. If an existing location is renamed and
  * renameMatches is true, matches using the old name are updated too.
  */
-function savePlace(pin, original, name, address, renameMatches, link) {
+function savePlace(pin, original, name, address, renameMatches, link, type) {
+  type = /^home/i.test(String(type || '')) ? 'Home' : 'Away';
   link = String(link || '').trim().slice(0, 500);
   if (link && !/^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|(www\.)?google\.[a-z.]+\/maps)/i.test(link)) {
     throw new Error('The map link must be a Google Maps link (from Share → Copy link).');
@@ -363,8 +379,8 @@ function savePlace(pin, original, name, address, renameMatches, link) {
       throw new Error('There is already a location called "' + name + '".');
     }
     const existing = original ? list.find(p => p.name.toLowerCase() === origLower) : null;
-    if (existing) sh.getRange(existing.row, 1, 1, 3).setValues([[name, address, link]]);
-    else sh.appendRow([name, address, link]);
+    if (existing) sh.getRange(existing.row, 1, 1, 4).setValues([[name, address, link, type]]);
+    else sh.appendRow([name, address, link, type]);
 
     if (existing && renameMatches && origLower !== lower) renamePlaceInMatches_(origLower, name);
     SpreadsheetApp.flush();
@@ -426,7 +442,7 @@ function ensurePlaces_() {
   const existingSheet = ss.getSheetByName(PLACES_SHEET);
   if (existingSheet) { fillDefaultPlaces_(existingSheet); return; }
   const sh = ss.insertSheet(PLACES_SHEET);
-  sh.getRange(1, 1, 1, 3).setValues([['Place', 'Address or Eircode', 'Google Maps link (optional)']]).setFontWeight('bold');
+  sh.getRange(1, 1, 1, 4).setValues([['Place', 'Address or Eircode', 'Google Maps link (optional)', 'Type (Home/Away)']]).setFontWeight('bold');
   const skip = ['', 'tbc', 'internal'];
   const seen = {};
   readMatches_().forEach(m => {
@@ -445,10 +461,22 @@ function fillDefaultPlaces_(sh) {
     sh.getRange(1, 3).setValue('Google Maps link (optional)').setFontWeight('bold');
     sh.setColumnWidth(3, 300);
   }
+  if (!String(sh.getRange(1, 4).getDisplayValue()).trim()) {
+    sh.getRange(1, 4).setValue('Type (Home/Away)').setFontWeight('bold');
+    sh.setColumnWidth(4, 130);
+  }
+  // blank Type cells: the Settings home location is Home, everything else Away
+  const home = getSettings_().homeLocation.toLowerCase();
+  const vals = sh.getDataRange().getDisplayValues();
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]).trim() && !String(vals[i][3] || '').trim()) {
+      sh.getRange(i + 1, 4).setValue(String(vals[i][0]).trim().toLowerCase() === home ? 'Home' : 'Away');
+    }
+  }
   const list = readPlaceList_();
   DEFAULT_PLACES.forEach(d => {
     const p = list.find(x => x.name.toLowerCase() === d.name.toLowerCase());
-    if (!p) { sh.appendRow([d.name, d.address, d.link]); return; }
+    if (!p) { sh.appendRow([d.name, d.address, d.link, d.type]); return; }
     if (!p.address) sh.getRange(p.row, 2).setValue(d.address);
     if (!p.link) sh.getRange(p.row, 3).setValue(d.link);
   });
@@ -465,7 +493,7 @@ function guessDivision_(team) {
 function ensureTeamSheets_() {
   const ss = SpreadsheetApp.getActive();
   const needTeams = !ss.getSheetByName(TEAMS_SHEET), needDivs = !ss.getSheetByName(DIV_SHEET);
-  if (!needTeams && !needDivs) return;
+  if (!needTeams && !needDivs) { fillDefaultManagers_(); return; }
   const matches = readMatches_();
   const ours = Array.from(new Set(matches.map(m => m.ourTeam).filter(Boolean))).sort();
   if (needTeams) {
@@ -474,6 +502,7 @@ function ensureTeamSheets_() {
     if (ours.length) sh.getRange(2, 1, ours.length, 3).setValues(ours.map(t => [t, guessDivision_(t), '']));
     sh.setColumnWidth(1, 200); sh.setColumnWidth(2, 180); sh.setColumnWidth(3, 200);
     sh.setFrozenRows(1);
+    fillDefaultManagers_();
   }
   if (needDivs) {
     const divOf = {}; readTeamInfo_().forEach(t => divOf[t.team] = t.division);
@@ -492,6 +521,16 @@ function ensureTeamSheets_() {
     sh.setColumnWidth(1, 180); sh.setColumnWidth(2, 220);
     sh.setFrozenRows(1);
   }
+}
+
+/** Fills DEFAULT_MANAGERS into blank Manager cells only. */
+function fillDefaultManagers_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(TEAMS_SHEET);
+  if (!sh) return;
+  readTeamInfo_().forEach(t => {
+    const key = Object.keys(DEFAULT_MANAGERS).find(k => k.toLowerCase() === t.team.toLowerCase());
+    if (key && !t.manager) sh.getRange(t.row, 3).setValue(DEFAULT_MANAGERS[key]);
+  });
 }
 
 function readTeamInfo_() {

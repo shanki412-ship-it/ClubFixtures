@@ -141,6 +141,18 @@
   .loc .ad.missing{color:var(--s-warn)}
   .loc .cnt{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap;text-align:right}
   .loc .grow{min-width:0;flex:1}
+  .loc{cursor:default}
+  .ptag{display:inline-block;font-size:10px;font-weight:800;color:#fff;border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:1px;text-transform:uppercase;letter-spacing:.4px}
+  .ptag.Home{background:var(--home)} .ptag.Away{background:var(--away)}
+  .lacts{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+  .lbtns{display:flex;gap:4px}
+  .lbtn{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:7px;padding:4px 8px;font-size:12px;cursor:pointer}
+  .lbtn.del{color:var(--s-bad);border-color:color-mix(in srgb,var(--s-bad) 40%,var(--line))}
+  .lbtn.add{color:var(--accent);border-color:var(--accent)}
+  .typeseg{display:flex;gap:6px}
+  .typeseg button{flex:1;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);border-radius:9px;padding:9px;font-size:14px;font-weight:600;cursor:pointer}
+  .typeseg button.on.Home{background:var(--home);border-color:var(--home);color:#fff}
+  .typeseg button.on.Away{background:var(--away);border-color:var(--away);color:#fff}
   .hint{font-size:12px;color:var(--muted);margin:8px 2px}
   .teaminfo{font-size:12px;color:var(--muted);padding:0 4px}
   .teaminfo b{color:var(--ink)}
@@ -264,7 +276,8 @@
         <select id="f_dateNote"><option value="">—</option><option>TBC</option><option>Internal</option></select>
       </div>
       <div><label>Time</label><input id="f_time" type="time"></div>
-      <div><label>Location</label><input id="f_place" list="placeDL" placeholder="e.g. Celbridge"></div>
+      <div><label>Location</label><select id="f_place"></select>
+        <input class="other" id="f_placeOther" placeholder="Location name"></div>
       <div><label>Venue</label>
         <select id="f_venue"><option value="">—</option><option>Home</option><option>Away</option><option>Neutral</option></select>
       </div>
@@ -296,6 +309,9 @@
     <h2 id="placeTitle">Add location</h2>
     <div class="fgrid">
       <div class="full"><label>Name (as used in fixtures)</label><input id="p_name" placeholder="e.g. Terenure"></div>
+      <div class="full"><label>Type</label><div class="typeseg" id="p_type">
+        <button type="button" class="Home" data-type="Home">🏠 Home venue</button>
+        <button type="button" class="Away" data-type="Away">🚌 Away venue</button></div></div>
       <div class="full"><label>Address or Eircode</label><input id="p_addr" placeholder="Street address or Eircode"></div>
       <div class="full"><label>Google Maps link (optional – exact pin)</label><input id="p_link" type="url" inputmode="url" placeholder="Paste from Google Maps → Share → Copy link"></div>
     </div>
@@ -743,28 +759,32 @@ function renderPlaces(){
   const list = (state.data.placeList || []).slice().sort((a,b) => a.name.localeCompare(b.name));
   const known = new Set(list.map(p => p.name.toLowerCase()));
   const unlisted = Object.keys(use).filter(k => !known.has(k) && NO_MAP.indexOf(k) < 0);
-  let html = adminSeg() + '<div class="hint">Locations used in fixtures. Add an address or Eircode so the 📍 link opens the right hall. '+
-             'Tap one to edit; renaming can fix a spelling in every match at once.</div>';
-  html += list.map(p => {
+  let html = adminSeg() + '<div class="hint">Home venues appear in the Location dropdown for home matches, away venues for away matches. '+
+             'Add an address or a Google Maps link so 📍 opens the right hall.</div>';
+  const block = (title, arr) => arr.length ? '<div class="day">'+title+' · '+arr.length+'</div>' + arr.map(p => {
     const n = use[p.name.toLowerCase()] || 0;
-    return '<div class="loc" data-name="'+esc(p.name)+'"><div class="grow"><div class="nm">'+esc(p.name)+'</div>'+
-      '<div class="ad'+(p.address||p.link?'':' missing')+'">'+(p.link ? '📌 ' : '')+(p.address ? esc(p.address) : p.link ? 'Map pin set' : 'No address yet')+
-      (state.data.homeLocation && p.name.toLowerCase() === state.data.homeLocation.toLowerCase() ? ' · <b>Home</b>' : '')+'</div></div>'+
-      '<div class="cnt">'+n+' match'+(n===1?'':'es')+'</div></div>';
-  }).join('') || '<div class="empty">No locations yet. Tap + Add location.</div>';
+    return '<div class="loc" data-name="'+esc(p.name)+'"><div class="grow"><div class="nm">'+esc(p.name)+'<span class="ptag '+p.type+'">'+p.type+'</span></div>'+
+      '<div class="ad'+(p.address||p.link?'':' missing')+'">'+(p.link ? '📌 ' : '')+(p.address ? esc(p.address) : p.link ? 'Map pin set' : 'No address yet')+'</div></div>'+
+      '<div class="lacts"><div class="lbtns"><button class="lbtn" data-edit-place="'+esc(p.name)+'">✏️ Edit</button>'+
+      '<button class="lbtn del" data-del-place="'+esc(p.name)+'">🗑 Delete</button></div>'+
+      '<div class="cnt">'+n+' match'+(n===1?'':'es')+'</div></div></div>';
+  }).join('') : '';
+  html += block('Home venues', list.filter(p => p.type === 'Home')) + block('Away venues', list.filter(p => p.type !== 'Home'));
+  if(!list.length) html += '<div class="empty">No locations yet. Tap + Add location.</div>';
   if(unlisted.length){
     html += '<div class="day">In fixtures but not in this list</div>' + unlisted.map(k => {
       const name = (state.data.matches.find(m => (m.place||'').toLowerCase() === k) || {}).place || k;
-      return '<div class="loc" data-new="'+esc(name)+'"><div class="grow"><div class="nm">'+esc(name)+'</div>'+
-        '<div class="ad missing">Tap to add it</div></div><div class="cnt">'+use[k]+' match'+(use[k]===1?'':'es')+'</div></div>';
+      return '<div class="loc"><div class="grow"><div class="nm">'+esc(name)+'</div>'+
+        '<div class="ad missing">Not in the list yet</div></div><div class="lacts"><button class="lbtn add" data-new="'+esc(name)+'">+ Add</button>'+
+        '<div class="cnt">'+use[k]+' match'+(use[k]===1?'':'es')+'</div></div></div>';
     }).join('');
   }
   $('list').innerHTML = html;
   wireAdminSeg();
-  $('list').querySelectorAll('.loc').forEach(el => el.onclick = () => {
-    if(el.dataset.new) openPlace(null, el.dataset.new);
-    else openPlace((state.data.placeList||[]).find(p => p.name === el.dataset.name));
-  });
+  const find = n => (state.data.placeList||[]).find(p => p.name === n);
+  $('list').querySelectorAll('[data-new]').forEach(b => b.onclick = () => openPlace(null, b.dataset.new));
+  $('list').querySelectorAll('[data-edit-place]').forEach(b => b.onclick = () => openPlace(find(b.dataset.editPlace)));
+  $('list').querySelectorAll('[data-del-place]').forEach(b => b.onclick = () => removePlace(find(b.dataset.delPlace)));
 }
 function openPlace(p, presetName){
   state.editPlace = p || null;
@@ -772,6 +792,7 @@ function openPlace(p, presetName){
   $('p_name').value = p ? p.name : (presetName || '');
   $('p_addr').value = p ? p.address : '';
   $('p_link').value = p ? (p.link || '') : '';
+  setPlaceType(p ? p.type : 'Away');
   $('pDel').style.display = p ? '' : 'none';
   const n = p ? (placeUsage()[p.name.toLowerCase()] || 0) : 0;
   $('p_renameWrap').style.display = 'none';
@@ -800,11 +821,22 @@ $('pSave').onclick = async () => {
   try{
     const p = state.editPlace;
     state.data = await call('savePlace', state.pin, p ? p.name : '', name, $('p_addr').value.trim(),
-      $('p_renameWrap').style.display !== 'none' && $('p_rename').checked, $('p_link').value.trim());
+      $('p_renameWrap').style.display !== 'none' && $('p_rename').checked, $('p_link').value.trim(), $('p_type').dataset.value || 'Away');
     $('placeOverlay').classList.remove('show'); render(); toast('Location saved');
   }catch(err){ $('placeErr').textContent = err.message || err; }
   $('pSave').disabled = false;
 };
+function setPlaceType(t){ $('p_type').dataset.value = t; $('p_type').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.type === t)); }
+$('p_type').querySelectorAll('button').forEach(b => b.onclick = () => setPlaceType(b.dataset.type));
+async function removePlace(p){
+  if(!p) return;
+  const n = placeUsage()[p.name.toLowerCase()] || 0;
+  if(!confirm('Delete '+p.name+' from the locations list?'+(n ? ' The '+n+' match'+(n===1?'':'es')+' using it keep the name, without the address.' : ''))) return;
+  try{
+    state.data = await call('deletePlace', state.pin, p.name);
+    $('placeOverlay').classList.remove('show'); render(); toast('Location deleted');
+  }catch(err){ toast(err.message || err); }
+}
 $('pDel').onclick = async () => {
   const p = state.editPlace; if(!p) return;
   if(!confirm('Remove '+p.name+' from the locations list? Matches keep their location text.')) return;
@@ -855,11 +887,9 @@ function openForm(m){
   $('formErr').textContent = '';
   $('f_status').innerHTML = state.data.statuses.map(s => '<option>'+esc(s)+'</option>').join('');
   fillOurTeam(m ? m.ourTeam : (state.team || ''));
-  const places = [...new Set([...(state.data.placeList||[]).map(p => p.name), ...state.data.matches.map(x => x.place)].filter(Boolean))].sort();
-  $('placeDL').innerHTML = places.map(p => '<option value="'+esc(p)+'">').join('');
   const blank = { ourTeam: state.team || '', status: state.data.statuses[0] || '' };
   FIELDS.forEach(f => {
-    if(f === 'ourTeam' || f === 'opponent') return;
+    if(f === 'ourTeam' || f === 'opponent' || f === 'place') return;
     const el = $('f_'+f), v = (m || blank)[f] || '';
     if(el.tagName === 'SELECT' && v && ![...el.options].some(o => o.value === v)){
       el.insertAdjacentHTML('beforeend','<option>'+esc(v)+'</option>');
@@ -867,6 +897,7 @@ function openForm(m){
     el.value = v;
   });
   fillOpponents(m ? m.opponent : '');
+  fillPlaces(m ? m.place : '');
   $('formOverlay').classList.add('show');
 }
 // Select + "Other…" text box. Value read through pick().
@@ -882,6 +913,21 @@ function setSelect(id, options, value, otherLabel){
   other.style.display = sel.value === '__other' ? 'block' : 'none';
 }
 function pick(id){ const v = $(id).value; return (v === '__other' ? $(id+'Other').value : v).trim(); }
+// Location options follow the venue: Home → home venues, Away → away venues (+ TBC/Internal, Other…)
+function fillPlaces(value){
+  const v = $('f_venue').value.toLowerCase(), pl = state.data.placeList || [];
+  const homes = pl.filter(p => p.type === 'Home').map(p => p.name);
+  const homeSet = new Set(homes.map(h => h.toLowerCase()));
+  const used = state.data.matches.filter(m => side(m) === 'away').map(m => m.place);
+  const seen = new Set(), aways = [];
+  [...pl.filter(p => p.type !== 'Home').map(p => p.name), ...used].forEach(x => {   // list names win over fixture spellings
+    const k = (x||'').toLowerCase();
+    if(x && !seen.has(k) && !homeSet.has(k) && NO_MAP.indexOf(k) < 0){ seen.add(k); aways.push(x); }
+  });
+  aways.sort((a,b) => a.localeCompare(b));
+  const opts = (v === 'home' ? homes : v === 'away' ? aways : [...homes, ...aways]).concat(['TBC','Internal']);
+  setSelect('f_place', opts, value, 'Other location…');
+}
 function fillOurTeam(value){ setSelect('f_ourTeam', state.data.teams, value, 'Other team…'); }
 function fillOpponents(value){
   const us = pick('f_ourTeam'), d = divisionOf(us);
@@ -890,7 +936,7 @@ function fillOpponents(value){
   setSelect('f_opponent', opts, value, opts.length ? 'Other (not in '+(d||'division')+')…' : 'Type opponent…');
   if(!opts.length && !value){ $('f_opponent').value = '__other'; $('f_opponentOther').style.display = 'block'; }
 }
-['f_ourTeam','f_opponent'].forEach(id => $(id).addEventListener('change', () => {
+['f_ourTeam','f_opponent','f_place'].forEach(id => $(id).addEventListener('change', () => {
   $(id+'Other').style.display = $(id).value === '__other' ? 'block' : 'none';
   if($(id).value === '__other') $(id+'Other').focus();
 }));
@@ -898,16 +944,25 @@ $('f_ourTeam').addEventListener('change', () => { fillOpponents(''); syncHomeAwa
 ['f_ourTeamOther','f_opponentOther'].forEach(id => $(id).addEventListener('change', syncHomeAway));
 function syncHomeAway(){
   const v = $('f_venue').value.toLowerCase(), us = pick('f_ourTeam'), them = pick('f_opponent');
-  if(v==='home'){ $('f_homeTeam').value = us; $('f_awayTeam').value = them; if(!$('f_place').value) $('f_place').value = homeVenue(); }
+  if(v==='home'){ $('f_homeTeam').value = us; $('f_awayTeam').value = them; }
   if(v==='away'){ $('f_homeTeam').value = them; $('f_awayTeam').value = us; }
+}
+// Venue changed: refill Location; a home match with no (or an away) location gets the home venue
+function onVenueChange(){
+  syncHomeAway();
+  const v = $('f_venue').value.toLowerCase(), cur = pick('f_place');
+  const isHomePlace = (state.data.placeList||[]).some(p => p.type === 'Home' && p.name.toLowerCase() === cur.toLowerCase());
+  fillPlaces(v === 'home' && (!cur || !isHomePlace) ? homeVenue() : v === 'away' && isHomePlace ? '' : cur);
 }
 function homeVenue(){
   if(state.data.homeLocation) return state.data.homeLocation;
+  const h = (state.data.placeList||[]).find(p => p.type === 'Home'); if(h) return h.name;
   const c = {};
   state.data.matches.forEach(m => { if(side(m)==='home' && m.place) c[m.place] = (c[m.place]||0) + 1; });
   return Object.keys(c).sort((a,b) => c[b]-c[a])[0] || '';
 }
-['f_venue','f_opponent'].forEach(id => $(id).addEventListener('change', syncHomeAway));
+$('f_venue').addEventListener('change', onVenueChange);
+$('f_opponent').addEventListener('change', syncHomeAway);
 $('f_date').addEventListener('change', () => { if($('f_date').value) $('f_dateNote').value = ''; });
 $('f_dateNote').addEventListener('change', () => { if($('f_dateNote').value) $('f_date').value = ''; });
 $('f_result').addEventListener('change', () => {
@@ -917,7 +972,7 @@ $('f_result').addEventListener('change', () => {
 $('fab').onclick = () => state.view !== 'places' ? openForm(null) : state.adminSec === 'teams' ? openTeam(null) : openPlace(null);
 $('formCancel').onclick = () => $('formOverlay').classList.remove('show');
 $('saveBtn').onclick = async () => {
-  const match = {}; FIELDS.forEach(f => match[f] = (f === 'ourTeam' || f === 'opponent') ? pick('f_'+f) : $('f_'+f).value.trim());
+  const match = {}; FIELDS.forEach(f => match[f] = (f === 'ourTeam' || f === 'opponent' || f === 'place') ? pick('f_'+f) : $('f_'+f).value.trim());
   if(!match.ourTeam || !match.opponent){ $('formErr').textContent = 'Our Team and Opponent are required.'; return; }
   $('saveBtn').disabled = true; $('formErr').textContent = 'Saving…';
   try{
