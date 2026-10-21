@@ -136,6 +136,8 @@ teams with fixtures show their match count instead, and the server refuses the r
 
 ## Look, title and version
 
+- **Theme button** (◐ / ☀️ / 🌙 in the header) switches Auto (follows the phone) → Light → Dark; each phone
+  remembers its own choice.
 - Colours follow the ACBC jersey (navy with mint triangles); the logo is a vector redraw in
   `assets/acbc-logo.svg` (a 1024px PNG is alongside for printing or WhatsApp).
 - **Browser-tab icon**: upload `assets/acbc-icon-512.png` to Google Drive, Share → *Anyone with the link*,

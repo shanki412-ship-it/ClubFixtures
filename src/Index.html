@@ -13,11 +13,16 @@
     --win:#0d9488; --loss:#dc2626; --draw:#8a8f98; /* results (CVD-validated, always lettered) */
     --s-grey:#64748b; --s-ok:#0b7a4b; --s-warn:#b45309; --s-bad:#dc2626;
   }
+  /* Theme: "Auto" follows the phone; Light / Dark are forced with data-theme on <html> */
+  :root{ --wa:#128c4a; color-scheme:light; }
   @media (prefers-color-scheme: dark){
-    :root{ --bg:#0f1418; --card:#182027; --ink:#e7edf2; --muted:#9aa7b3; --line:#2a353f; --soft:#1f2932;
-      --bg:#0f1326; --card:#1a2038; --soft:#222a46; --line:#2c3556;
-      --brand:#2a335e; --accent:#7fd8b6; --home:#3b82f6; --away:#f97316; --win:#14b8a6; --loss:#ef4444; --draw:#9aa1aa; }
+    :root:not([data-theme="light"]){ --bg:#0f1326; --card:#1a2038; --ink:#e7edf2; --muted:#9aa7b3; --line:#2c3556; --soft:#222a46;
+      --brand:#2a335e; --accent:#7fd8b6; --home:#3b82f6; --away:#f97316; --win:#14b8a6; --loss:#ef4444; --draw:#9aa1aa; --wa:#4ade80;
+      color-scheme:dark; }
   }
+  :root[data-theme="dark"]{ --bg:#0f1326; --card:#1a2038; --ink:#e7edf2; --muted:#9aa7b3; --line:#2c3556; --soft:#222a46;
+      --brand:#2a335e; --accent:#7fd8b6; --home:#3b82f6; --away:#f97316; --win:#14b8a6; --loss:#ef4444; --draw:#9aa1aa; --wa:#4ade80;
+      color-scheme:dark; }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
 
@@ -169,8 +174,8 @@
   .opp-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:3px 4px 3px 10px;font-size:12.5px}
   .opp-chip .on{border:0;background:none;color:var(--ink);padding:0;font-size:12.5px;cursor:pointer;width:auto;height:auto}
   .opp-chip .on .ph{color:var(--accent);font-weight:700}
-    .wa{display:inline-flex;align-items:center;gap:3px;color:#128c4a;font-weight:700;text-decoration:none;white-space:nowrap}
-  @media (prefers-color-scheme: dark){ .wa{color:#4ade80} }
+    .wa{display:inline-flex;align-items:center;gap:3px;color:var(--wa);font-weight:700;text-decoration:none;white-space:nowrap}
+
   .wa svg{width:13px;height:13px;flex:0 0 auto}
   .mgrs{display:flex;flex-wrap:nowrap;gap:12px;padding:0 8px 6px 10px;margin-top:-3px;font-size:11.5px;color:var(--muted);min-width:0}
   .mgrs > span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -215,6 +220,7 @@
   footer{text-align:center;font-size:11px;color:var(--muted);padding:6px 12px 90px}
   footer b{color:var(--ink);font-weight:600}
 </style>
+<script>try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 </head>
 <body>
 <header>
@@ -229,6 +235,7 @@
         font-size="27" letter-spacing="1" fill="#f4f2f8">ACBC</text>
 </svg>
     <div class="ttl"><h1 id="club">ACBC Juvenile League 2026-27</h1><div class="sub" id="sub">Loading…</div></div>
+    <button class="icon-btn" id="themeBtn" title="Theme" aria-label="Theme">◐</button>
     <button class="icon-btn" id="refreshBtn" title="Refresh" aria-label="Refresh">⟳</button>
     <button class="icon-btn" id="adminBtn" title="Admin login">🔒 Admin</button>
   </div>
@@ -501,6 +508,21 @@ async function load(silent){
     $('sub').textContent = 'Error';
   }
 }
+// ---- theme: Auto (follow the phone) → Light → Dark, remembered on this device ----
+const THEMES = { auto:{icon:'◐', label:'Auto (follows your phone)'}, light:{icon:'☀️', label:'Light'}, dark:{icon:'🌙', label:'Dark'} };
+function applyTheme(t){
+  if(!THEMES[t]) t = 'auto';
+  if(t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+  $('themeBtn').textContent = THEMES[t].icon;
+  $('themeBtn').title = 'Theme: ' + THEMES[t].label + ' – tap to change';
+  state.theme = t;
+}
+$('themeBtn').onclick = () => {
+  const next = { auto:'light', light:'dark', dark:'auto' }[state.theme || 'auto'];
+  applyTheme(next); store.set('theme', next); toast('Theme: ' + THEMES[next].label);
+};
+applyTheme(store.get('theme') || 'auto');
+
 // ---- update checks: every 30 min, and when the app comes back to the foreground ----
 const CHECK_EVERY = 30 * 60 * 1000, MIN_GAP = 2 * 60 * 1000;
 function busy(){ return ['formOverlay','placeOverlay','teamOverlay','pinOverlay','oppOverlay'].some(id => $(id).classList.contains('show')); }
