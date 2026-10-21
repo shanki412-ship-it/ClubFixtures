@@ -1,0 +1,63 @@
+# Every time something in src/ changes on main, this sends the code to Apps Script
+# and updates the fixtures web app. The app link stays the same.
+name: Deploy to Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'deploy.json', '.clasp.json']
+  workflow_dispatch:        # "Run workflow" button on the Actions tab
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check the code for mistakes before sending it
+        run: node tools/check.js
+
+      - name: Sign in to Google
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ]; then
+            echo "::error::The CLASPRC_JSON secret is missing. Run tools/setup.sh once (see README)."
+            exit 1
+          fi
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+          chmod 600 ~/.clasprc.json
+
+      - name: Send the code to Apps Script
+        run: |
+          if ! grep -q '"scriptId": *"[A-Za-z0-9_-]\{20,\}"' .clasp.json; then
+            echo "::error::.clasp.json has no Script ID yet. Run tools/setup.sh once (see README)."
+            exit 1
+          fi
+          npx --yes @google/clasp@3.4.1 push --force
+
+      - name: Update the web app (same link)
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          ID=$(jq -r '.deploymentId // ""' deploy.json)
+          if [ -z "$ID" ]; then
+            echo "::warning::No deploymentId in deploy.json – the code is in Apps Script, but the app wasn't updated."
+            exit 0
+          fi
+          npx --yes @google/clasp@3.4.1 update-deployment "$ID" --description "GitHub ${GITHUB_SHA::7} – $(printf '%s' "${COMMIT_MSG:-manual run}" | head -1 | cut -c1-80)"
+          echo "### ✅ Club Fixtures app is updated" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit ${GITHUB_SHA::7}. Managers just refresh the app to see the changes." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the sign-in file
+        if: always()
+        run: rm -f ~/.clasprc.json

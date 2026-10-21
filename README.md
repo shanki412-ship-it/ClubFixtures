@@ -3,6 +3,15 @@
 A phone-friendly fixtures app for the club, built on Google Sheets + Apps Script.
 Team managers open one link to see matches; admins unlock editing with a PIN.
 
+**Changes to `src/` on `main` go live automatically** (GitHub Actions → `clasp`), the same way as FitBull.
+No copy-paste, no Deploy clicks, and the app link stays the same.
+
+| Repo file | Goes to Apps Script as |
+|---|---|
+| `src/Code.gs` | Code.gs |
+| `src/Index.html` | Index (the page) |
+| `src/appsscript.json` | Project settings (time zone, web-app access) |
+
 ## Sheet layout
 
 **Matches tab** (named `Matches`, or any tab whose row 1 has these headers — order doesn't matter):
@@ -10,7 +19,7 @@ Team managers open one link to see matches; admins unlock editing with a PIN.
 | Our Team | Opponent | Venue | Home Team | Away Team | Status | Time | Date | Location |
 |---|---|---|---|---|---|---|---|---|
 
-- `Venue`: Home / Away / Neutral (drives the green/blue badge)
+- `Venue`: Home / Away / Neutral (blue / orange in the app)
 - `Time`: HH:MM, or blank
 - `Date`: a real date (shown as 1-Nov-2026), or a note such as **TBC** or **Internal**
 - `Location`: where it's played (Celbridge, Terenure, Kadka…), or TBC / Internal
@@ -35,20 +44,46 @@ searches "<place>, Ireland".
 | Viewer Code | Optional code managers enter once. Blank = anyone with the link can view |
 | Statuses | Options in the status dropdown |
 
-## Setup (≈5 minutes)
+## How a change goes live
 
-1. Open the fixtures Google Sheet → **Extensions → Apps Script**.
-2. Replace `Code.gs` with this repo's `Code.gs`. Add an HTML file named `Index` and paste `Index.html`.
-3. Project Settings → tick **Show "appsscript.json"** → paste `appsscript.json`.
-4. Select `splitIntoSeparateColumns` in the function dropdown → **Run** → authorise (one-time conversion).
-5. Select `setup` → **Run**. This creates the **Settings** and **Places** tabs.
-6. Back in the sheet, fill in **Settings** (club name, admin PINs, optional viewer code) and the addresses in **Places**.
-7. **Deploy → New deployment → Web app**
-   - Execute as: **Me**
-   - Who has access: **Anyone**
-8. Copy the web app URL and share it in the managers' WhatsApp group. On a phone: open it → Share → **Add to Home Screen**.
+1. A change to `src/` is pushed to `main` (by Claude, or by you editing on GitHub).
+2. **Actions → Deploy to Apps Script** runs. It takes about 1 minute:
+   - It checks the code for mistakes. If it finds one, it stops and the live app stays as it was.
+   - It sends the files to Apps Script (`clasp push`).
+   - It updates the existing web-app deployment to a new version, so the link stays the same.
+3. Managers refresh the app to see the change.
 
-After code changes: **Deploy → Manage deployments → Edit → New version** (keeps the same URL).
+## One-time setup for auto-deploy (≈5 minutes)
+
+You need the app already deployed once as a web app (Deploy → New deployment → Web app,
+Execute as **Me**, access **Anyone**).
+
+1. On this repo's GitHub page: **Code → Codespaces → Create codespace on main**.
+2. In the terminal at the bottom, run:
+   ```
+   bash tools/setup.sh
+   ```
+3. Follow the prompts:
+   1. Check the Apps Script API is on at script.google.com/home/usersettings (it is already, from FitBull).
+   2. Sign in to Google with the account that **owns the fixtures sheet**.
+   3. Paste the Apps Script project address (fixtures sheet → Extensions → Apps Script → copy the browser address).
+   4. Your web-app deployment is found automatically. If there's more than one, pick the link the managers use.
+   5. A secret called `CLASPRC_JSON` is added to the repo. If the script can't add it, it shows the text to
+      paste under **Settings → Secrets and variables → Actions**.
+4. The script then saves the project link to GitHub, which runs the first deploy. Check it on the **Actions** tab.
+5. Delete the codespace at github.com/codespaces.
+
+Any files in the Apps Script project that aren't in this repo are copied into `src/` first, so the first deploy
+doesn't delete them.
+
+## First-time sheet setup
+
+1. In the Apps Script editor, run `splitIntoSeparateColumns` once (converts "Celbridge @ 18:00" cells).
+2. Run `setup`. This creates the **Settings** and **Places** tabs.
+3. In the sheet, fill in **Settings** (club name, admin PINs, optional viewer code) and the addresses in **Places**.
+4. Share the web-app link in the managers' WhatsApp group. On a phone: open it → Share → **Add to Home Screen**.
+
+Both functions are also in the sheet's **Fixtures App** menu.
 
 ## How it works
 
@@ -68,6 +103,17 @@ After code changes: **Deploy → Manage deployments → Edit → New version** (
 - Edits write straight into the sheet; admins can also keep editing the sheet directly.
 - If someone changed a row in the sheet after the app loaded, the save is blocked with
   "refresh and try again", so nobody overwrites anyone else's change.
+
+## Good to know
+
+- **Changes made in the Apps Script editor get overwritten by the next deploy.** Make code changes here instead.
+  (Editing the *sheet* — fixtures, Settings, Places — is always fine.)
+- **The `CLASPRC_JSON` secret** is a sign-in for your Google account's Apps Script projects. GitHub stores it
+  encrypted, and only this repo's Actions can read it. To cancel it, go to myaccount.google.com/permissions and
+  remove "clasp – The Apps Script CLI", then run `tools/setup.sh` again. Doing that also cancels FitBull's
+  sign-in if it's the same Google account, so re-run setup there too.
+- **Apps Script keeps up to 200 versions.** If a deploy says the limit is reached, delete old versions in the
+  Apps Script editor (Project history), then use **Run workflow** again.
 
 ## Security notes
 
