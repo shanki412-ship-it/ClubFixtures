@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+  :root{
+    --bg:#f4f6f8; --card:#fff; --ink:#15202b; --muted:#66727f; --line:#e3e8ee;
+    --brand:#0b5d3b; --brand-ink:#fff; --home:#0b7a4b; --away:#2563eb;
+    --s-sched:#64748b; --s-conf:#0b7a4b; --s-post:#d97706; --s-canc:#dc2626; --s-play:#475569;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0f1418; --card:#182027; --ink:#e7edf2; --muted:#93a1ad; --line:#26313a; --brand:#17885a; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  header{background:var(--brand);color:var(--brand-ink);padding:16px 16px 12px;position:sticky;top:0;z-index:5}
+  .top{display:flex;align-items:center;gap:8px}
+  .top h1{font-size:19px;margin:0;flex:1;letter-spacing:.2px}
+  .icon-btn{background:rgba(255,255,255,.16);border:0;color:#fff;border-radius:10px;height:36px;min-width:36px;padding:0 10px;font-size:15px;cursor:pointer}
+  .icon-btn.on{background:#fff;color:var(--brand);font-weight:600}
+  .sub{font-size:12px;opacity:.8;margin-top:4px}
+  .tabs{display:flex;gap:6px;margin-top:12px}
+  .tab{flex:1;border:0;border-radius:10px;padding:8px;background:rgba(255,255,255,.14);color:#fff;font-size:14px;cursor:pointer}
+  .tab.on{background:#fff;color:var(--brand);font-weight:600}
+  .controls{padding:12px 16px 4px;display:flex;flex-direction:column;gap:10px}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+  .chip{white-space:nowrap;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+  .chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .search{width:100%;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:15px}
+  main{padding:4px 16px 100px;max-width:720px;margin:0 auto}
+  .day{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:18px 2px 8px}
+  .day .today{color:var(--brand);margin-left:6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px}
+  .card.edit{cursor:pointer}
+  .card.dim{opacity:.6}
+  .time{min-width:52px;font-weight:700;font-size:16px;padding-top:2px}
+  .time small{display:block;font-weight:500;font-size:11px;color:var(--muted)}
+  .body{flex:1;min-width:0}
+  .team{font-size:12px;font-weight:600;color:var(--brand)}
+  .vs{font-size:16px;font-weight:600;margin:2px 0 6px;overflow-wrap:anywhere}
+  .vs span{color:var(--muted);font-weight:400}
+  .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+  .pill{border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.4px}
+  .loc{color:var(--muted);text-decoration:none;overflow-wrap:anywhere}
+  .loc:hover{text-decoration:underline}
+  .empty,.msg{text-align:center;color:var(--muted);padding:48px 16px}
+  .fab{position:fixed;right:18px;bottom:22px;background:var(--brand);color:#fff;border:0;border-radius:999px;padding:14px 20px;font-size:15px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer;display:none}
+  .fab.show{display:block}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:20}
+  .overlay.show{display:flex}
+  .sheet{background:var(--card);width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:18px 16px 24px;max-height:92vh;overflow:auto}
+  @media(min-width:600px){.overlay{align-items:center}.sheet{border-radius:18px}}
+  .sheet h2{margin:0 0 14px;font-size:18px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .full{grid-column:1/-1}
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+  input,select{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:10px;font-size:15px}
+  .row{display:flex;gap:8px;margin-top:16px}
+  .btn{flex:1;border:0;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer}
+  .primary{background:var(--brand);color:#fff}
+  .ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+  .danger{background:transparent;color:var(--s-canc);border:1px solid var(--s-canc)}
+  .err{color:var(--s-canc);font-size:13px;margin-top:10px;min-height:1em}
+  .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:30}
+  .toast.show{opacity:.92}
+  .gate{max-width:360px;margin:60px auto;padding:0 16px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1 id="club">Fixtures</h1>
+    <button class="icon-btn" id="refreshBtn" title="Refresh">⟳</button>
+    <button class="icon-btn" id="adminBtn" title="Admin" style="display:none">🔒</button>
+  </div>
+  <div class="sub" id="sub">Loading…</div>
+  <div class="tabs">
+    <button class="tab on" data-view="upcoming">Upcoming</button>
+    <button class="tab" data-view="past">Results</button>
+    <button class="tab" data-view="all">All</button>
+  </div>
+</header>
+
+<div class="controls" id="controls">
+  <div class="chips" id="chips"></div>
+  <input class="search" id="search" type="search" placeholder="Search opponent, venue, location…">
+</div>
+
+<main id="list"><div class="msg">Loading fixtures…</div></main>
+<button class="fab" id="fab">+ Add match</button>
+
+<!-- PIN / code prompt -->
+<div class="overlay" id="pinOverlay">
+  <div class="sheet">
+    <h2 id="pinTitle">Admin login</h2>
+    <label for="pinInput" id="pinLabel">Admin PIN</label>
+    <input id="pinInput" type="password" inputmode="numeric" autocomplete="off">
+    <div class="err" id="pinErr"></div>
+    <div class="row">
+      <button class="btn ghost" id="pinCancel">Cancel</button>
+      <button class="btn primary" id="pinOk">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit form -->
+<div class="overlay" id="formOverlay">
+  <div class="sheet">
+    <h2 id="formTitle">Add match</h2>
+    <div class="grid">
+      <div><label>Our Team</label><input id="f_ourTeam" list="teamList"></div>
+      <div><label>Opponent</label><input id="f_opponent"></div>
+      <div><label>Date</label><input id="f_date" type="date"></div>
+      <div><label>…or if no date yet</label>
+        <select id="f_dateNote"><option value="">—</option><option>TBC</option><option>Internal</option></select>
+      </div>
+      <div><label>Location</label><input id="f_place" list="placeList" placeholder="e.g. Celbridge"></div>
+      <div><label>Time</label><input id="f_time" type="time"></div>
+      <div><label>Venue</label>
+        <select id="f_venue"><option value="">—</option><option>Home</option><option>Away</option><option>Neutral</option></select>
+      </div>
+      <div><label>Status</label><select id="f_status"></select></div>
+      <div><label>Home Team</label><input id="f_homeTeam"></div>
+      <div><label>Away Team</label><input id="f_awayTeam"></div>
+    </div>
+    <datalist id="teamList"></datalist>
+    <datalist id="placeList"></datalist>
+    <div class="err" id="formErr"></div>
+    <div class="row">
+      <button class="btn danger" id="delBtn" style="flex:0 0 auto;padding:12px 16px">Delete</button>
+      <button class="btn ghost" id="formCancel">Cancel</button>
+      <button class="btn primary" id="saveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const FIELDS = ['ourTeam','opponent','venue','homeTeam','awayTeam','status','date','dateNote','time','place'];
+const NO_MAP = ['', 'tbc', 'internal'];
+const state = { data:null, view:'upcoming', team:'', q:'', pin:'', editing:null };
+const $ = id => document.getElementById(id);
+
+// ---- storage helpers (may be unavailable) ----
+const store = {
+  get(k, s){ try{ return (s?sessionStorage:localStorage).getItem(k) || ''; }catch(e){ return ''; } },
+  set(k, v, s){ try{ (s?sessionStorage:localStorage).setItem(k, v); }catch(e){} },
+  del(k, s){ try{ (s?sessionStorage:localStorage).removeItem(k); }catch(e){} }
+};
+
+function call(fn, ...args){
+  return new Promise((resolve, reject) => {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
+  });
+}
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2200); }
+function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function isISO(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s||''); }
+function dayLabel(iso){
+  if(!isISO(iso)) return 'Date TBC';
+  const [y,m,d] = iso.split('-').map(Number);
+  return new Date(y,m-1,d).toLocaleDateString('en-IE',{weekday:'short',day:'numeric',month:'short',year: y!==new Date().getFullYear()?'numeric':undefined});
+}
+function statusColor(s){
+  const k=(s||'').toLowerCase();
+  if(k.startsWith('not')) return 'var(--s-sched)';
+  if(k.startsWith('conf')||k.startsWith('sched')) return 'var(--s-conf)';
+  if(k.startsWith('post')||k.includes('tbc')) return 'var(--s-post)';
+  if(k.startsWith('canc')||k.includes('forfeit')) return 'var(--s-canc)';
+  if(k.startsWith('play')||k.includes('complete')||k.includes('final')) return 'var(--s-play)';
+  return 'var(--s-sched)';
+}
+
+// ---- load ----
+async function load(silent){
+  if(!silent) $('sub').textContent = 'Loading…';
+  try{
+    const res = await call('getBootstrap', store.get('viewerCode'));
+    if(res.locked){ showGate(res.clubName); return; }
+    state.data = res;
+    $('club').textContent = res.clubName + ' Fixtures';
+    document.title = res.clubName + ' Fixtures';
+    $('adminBtn').style.display = res.adminEnabled ? '' : 'none';
+    $('sub').textContent = res.matches.length + ' matches · updated ' + res.loadedAt + (state.pin ? ' · Admin mode' : '');
+    if(state.team && res.teams.indexOf(state.team) < 0) state.team = '';
+    renderChips(); render();
+  }catch(e){
+    $('list').innerHTML = '<div class="msg">Couldn’t load fixtures.<br>'+esc(e.message||e)+'</div>';
+    $('sub').textContent = 'Error';
+  }
+}
+
+function showGate(club){
+  $('club').textContent = club + ' Fixtures';
+  $('sub').textContent = 'Access code required';
+  $('controls').style.display = 'none';
+  document.querySelector('.tabs').style.display = 'none';
+  $('list').innerHTML = '<div class="gate"><p>Enter the team managers’ access code to view fixtures.</p>'+
+    '<input id="gateInput" type="password" autocomplete="off" placeholder="Access code">'+
+    '<div class="row"><button class="btn primary" id="gateOk">View fixtures</button></div><div class="err" id="gateErr"></div></div>';
+  $('gateOk').onclick = async () => {
+    store.set('viewerCode', $('gateInput').value.trim());
+    const res = await call('getBootstrap', store.get('viewerCode'));
+    if(res.locked){ $('gateErr').textContent = 'That code isn’t right.'; return; }
+    $('controls').style.display = ''; document.querySelector('.tabs').style.display = '';
+    load();
+  };
+  $('gateInput').onkeydown = e => { if(e.key==='Enter') $('gateOk').click(); };
+}
+
+// ---- render ----
+function renderChips(){
+  const teams = state.data.teams;
+  const chips = [['','All teams'], ...teams.map(t=>[t,t])];
+  $('chips').innerHTML = chips.map(([v,l]) =>
+    '<button class="chip'+(state.team===v?' on':'')+'" data-team="'+esc(v)+'">'+esc(l)+'</button>').join('');
+  $('chips').querySelectorAll('.chip').forEach(b => b.onclick = () => {
+    state.team = b.dataset.team; store.set('myTeam', state.team); renderChips(); render();
+  });
+}
+
+function render(){
+  const today = todayISO();
+  const q = state.q.toLowerCase();
+  let rows = state.data.matches.filter(m => {
+    if(state.team && m.ourTeam !== state.team) return false;
+    if(q && !FIELDS.some(f => String(m[f]).toLowerCase().includes(q))) return false;
+    const dated = isISO(m.date);
+    if(state.view==='upcoming') return !dated || m.date >= today;
+    if(state.view==='past') return dated && m.date < today;
+    return true;
+  });
+  const key = m => (isISO(m.date) ? m.date : '9999-99-99 ' + (m.dateNote||'zzz').toLowerCase()) + ' ' + (m.time || '99:99') + ' ' + m.ourTeam;
+  rows.sort((a,b) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
+  if(state.view==='past') rows.reverse();
+
+  if(!rows.length){
+    $('list').innerHTML = '<div class="empty">No '+(state.view==='past'?'results':'matches')+' to show'+(state.team?' for '+esc(state.team):'')+'.</div>';
+    return;
+  }
+  let html = '', lastDay = null;
+  rows.forEach(m => {
+    const d = isISO(m.date) ? m.date : 'note:' + (m.dateNote||'').toLowerCase();
+    if(d !== lastDay){
+      const label = isISO(m.date) ? dayLabel(m.date) : (/^internal$/i.test(m.dateNote) ? 'Internal matches' : 'Date to be confirmed');
+      html += '<div class="day">'+esc(label)+(m.date===today?'<span class="today">· Today</span>':'')+'</div>';
+      lastDay = d;
+    }
+    const venue = (m.venue||'').toLowerCase();
+    const vPill = venue.startsWith('home') ? '<span class="pill" style="background:var(--home)">Home</span>'
+                : venue.startsWith('away') ? '<span class="pill" style="background:var(--away)">Away</span>'
+                : m.venue ? '<span class="pill" style="background:var(--s-sched)">'+esc(m.venue)+'</span>' : '';
+    const sPill = m.status ? '<span class="pill" style="background:'+statusColor(m.status)+'">'+esc(m.status)+'</span>' : '';
+    const fixture = (m.homeTeam && m.awayTeam)
+      ? esc(m.homeTeam)+' <span>v</span> '+esc(m.awayTeam)
+      : esc(m.ourTeam)+' <span>v</span> '+esc(m.opponent);
+    const pk = (m.place||'').toLowerCase();
+    let loc = '';
+    if(NO_MAP.indexOf(pk) < 0){
+      const q = state.data.places[pk] || (m.place + ', Ireland');
+      loc = '<a class="loc" target="_blank" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q)+'">📍 '+esc(m.place)+'</a>';
+    } else if(pk === 'tbc'){
+      loc = '<span>📍 Venue TBC</span>';
+    }
+    const dim = /canc|post/i.test(m.status) ? ' dim' : '';
+    html += '<div class="card'+(state.pin?' edit':'')+dim+'" data-row="'+m.row+'">'+
+      '<div class="time">'+(esc(m.time)||'TBC')+'</div>'+
+      '<div class="body"><div class="team">'+esc(m.ourTeam)+'</div>'+
+      '<div class="vs">'+fixture+'</div>'+
+      '<div class="meta">'+vPill+sPill+loc+'</div></div></div>';
+  });
+  $('list').innerHTML = html;
+  if(state.pin){
+    $('list').querySelectorAll('.card').forEach(c => c.onclick = e => {
+      if(e.target.closest('a')) return;
+      openForm(state.data.matches.find(m => String(m.row) === c.dataset.row));
+    });
+  }
+}
+
+// ---- admin ----
+function setAdmin(pin){
+  state.pin = pin;
+  if(pin) store.set('adminPin', pin, true); else store.del('adminPin', true);
+  $('adminBtn').classList.toggle('on', !!pin);
+  $('adminBtn').textContent = pin ? 'Admin ✓' : '🔒';
+  $('fab').classList.toggle('show', !!pin);
+  if(state.data){ $('sub').textContent = state.data.matches.length + ' matches · updated ' + state.data.loadedAt + (pin?' · Admin mode':''); render(); }
+}
+
+$('adminBtn').onclick = () => {
+  if(state.pin){ setAdmin(''); toast('Admin mode off'); return; }
+  $('pinInput').value=''; $('pinErr').textContent='';
+  $('pinOverlay').classList.add('show'); setTimeout(()=>$('pinInput').focus(),50);
+};
+$('pinCancel').onclick = () => $('pinOverlay').classList.remove('show');
+$('pinOk').onclick = async () => {
+  const pin = $('pinInput').value.trim(); if(!pin) return;
+  $('pinOk').disabled = true; $('pinErr').textContent = 'Checking…';
+  try{
+    const ok = await call('verifyAdmin', pin);
+    if(ok){ $('pinOverlay').classList.remove('show'); setAdmin(pin); toast('Admin mode on – tap a match to edit'); }
+    else $('pinErr').textContent = 'PIN not recognised.';
+  }catch(e){ $('pinErr').textContent = e.message || e; }
+  $('pinOk').disabled = false;
+};
+$('pinInput').onkeydown = e => { if(e.key==='Enter') $('pinOk').click(); };
+
+function openForm(m){
+  state.editing = m || null;
+  $('formTitle').textContent = m ? 'Edit match' : 'Add match';
+  $('delBtn').style.display = m ? '' : 'none';
+  $('formErr').textContent = '';
+  $('f_status').innerHTML = state.data.statuses.map(s => '<option>'+esc(s)+'</option>').join('');
+  $('teamList').innerHTML = state.data.teams.map(t => '<option value="'+esc(t)+'">').join('');
+  const places = [...new Set(state.data.matches.map(x => x.place).filter(Boolean))].sort();
+  $('placeList').innerHTML = places.map(p => '<option value="'+esc(p)+'">').join('');
+  const blank = { ourTeam: state.team || '', status: state.data.statuses[0] || '' };
+  FIELDS.forEach(f => {
+    const el = $('f_'+f), v = (m || blank)[f] || '';
+    if(el.tagName === 'SELECT' && v && ![...el.options].some(o => o.value === v)){
+      el.insertAdjacentHTML('beforeend','<option>'+esc(v)+'</option>');
+    }
+    el.value = v;
+  });
+  $('formOverlay').classList.add('show');
+}
+
+// Auto-fill Home/Away team from venue
+function syncHomeAway(){
+  const v = $('f_venue').value.toLowerCase(), us = $('f_ourTeam').value, them = $('f_opponent').value;
+  if(v==='home'){ $('f_homeTeam').value = us; $('f_awayTeam').value = them; if(!$('f_place').value) $('f_place').value = homeVenue(); }
+  if(v==='away'){ $('f_homeTeam').value = them; $('f_awayTeam').value = us; }
+}
+// Most common location for home matches (e.g. Celbridge)
+function homeVenue(){
+  const c = {};
+  state.data.matches.forEach(m => { if(/^home/i.test(m.venue) && m.place) c[m.place] = (c[m.place]||0) + 1; });
+  return Object.keys(c).sort((a,b) => c[b]-c[a])[0] || '';
+}
+['f_venue','f_ourTeam','f_opponent'].forEach(id => $(id).addEventListener('change', syncHomeAway));
+$('f_date').addEventListener('change', () => { if($('f_date').value) $('f_dateNote').value = ''; });
+$('f_dateNote').addEventListener('change', () => { if($('f_dateNote').value) $('f_date').value = ''; });
+
+$('fab').onclick = () => openForm(null);
+$('formCancel').onclick = () => $('formOverlay').classList.remove('show');
+
+$('saveBtn').onclick = async () => {
+  const match = {}; FIELDS.forEach(f => match[f] = $('f_'+f).value.trim());
+  if(!match.ourTeam || !match.opponent){ $('formErr').textContent = 'Our Team and Opponent are required.'; return; }
+  $('saveBtn').disabled = true; $('formErr').textContent = 'Saving…';
+  try{
+    const e = state.editing;
+    state.data = await call('saveMatch', state.pin, match, e ? e.row : null, e ? e.fp : null);
+    $('formOverlay').classList.remove('show'); renderChips(); render(); toast('Saved');
+  }catch(err){ $('formErr').textContent = err.message || err; }
+  $('saveBtn').disabled = false;
+};
+
+$('delBtn').onclick = async () => {
+  const e = state.editing; if(!e) return;
+  if(!confirm('Delete '+e.ourTeam+' v '+e.opponent+'?')) return;
+  $('formErr').textContent = 'Deleting…';
+  try{
+    state.data = await call('deleteMatch', state.pin, e.row, e.fp);
+    $('formOverlay').classList.remove('show'); renderChips(); render(); toast('Deleted');
+  }catch(err){ $('formErr').textContent = err.message || err; }
+};
+
+// ---- misc wiring ----
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+  t.classList.add('on'); state.view = t.dataset.view; if(state.data) render();
+});
+$('search').oninput = e => { state.q = e.target.value; if(state.data) render(); };
+$('refreshBtn').onclick = () => load();
+[$('pinOverlay'), $('formOverlay')].forEach(o => o.addEventListener('click', e => { if(e.target === o) o.classList.remove('show'); }));
+
+state.team = store.get('myTeam');
+const savedPin = store.get('adminPin', true);
+if(savedPin) setAdmin(savedPin);
+load();
+</script>
+</body>
+</html>
