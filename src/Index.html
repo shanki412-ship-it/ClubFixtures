@@ -194,6 +194,13 @@
   .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:#111;color:#fff;padding:9px 14px;border-radius:9px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:10}
   .toast.show{opacity:.92}
   .gate{max-width:360px;margin:50px auto;padding:0 16px;text-align:center}
+  .upd{position:fixed;left:50%;transform:translateX(-50%);bottom:76px;z-index:15;display:none;align-items:center;gap:10px;
+    background:var(--navy);color:#fff;border:2px solid var(--mint);border-radius:12px;padding:8px 8px 8px 14px;
+    box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:13px;width:max-content;max-width:calc(100% - 24px)}
+  .upd.show{display:flex}
+  .upd a,.upd button{border:0;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap}
+  .upd .go{background:var(--mint);color:var(--navy)}
+  .upd .x{background:transparent;color:#fff;padding:7px 6px}
   footer{text-align:center;font-size:11px;color:var(--muted);padding:6px 12px 90px}
   footer b{color:var(--ink);font-weight:600}
 </style>
@@ -246,6 +253,7 @@
 <main id="list"><div class="msg">Loading fixtures…</div></main>
 <footer id="foot"><b id="footTitle">ACBC Juvenile League 2026-27</b> · <span id="ver">v–</span></footer>
 <button class="fab" id="fab">+ Add match</button>
+<div class="upd" id="upd" role="status"><span id="updMsg"></span><a class="go" id="updGo" href="#">Reload</a><button class="x" id="updX" aria-label="Dismiss">✕</button></div>
 
 <!-- Admin login -->
 <div class="overlay" id="pinOverlay">
@@ -414,19 +422,62 @@ async function load(silent){
   if(!silent) $('sub').textContent = 'Loading…';
   try{
     const r = await call('getBootstrap', store.get('viewerCode'));
-    if(r.locked){ showGate(r.clubName); return; }
+    if(r.locked){ if(!silent) showGate(r.clubName); return; }
     state.data = r;
+    if(!state.codeVersion) state.codeVersion = r.version;     // the version of the code running in this page
+    state.lastCheck = Date.now();
     $('club').textContent = r.title || r.clubName;
     document.title = r.title || r.clubName;
     $('footTitle').textContent = r.title || r.clubName;
-    $('ver').textContent = 'v' + (r.version || '');
+    $('ver').textContent = 'v' + (state.codeVersion || '');
     if(state.team && r.teams.indexOf(state.team) < 0) state.team = '';
     updateSub(); renderChips(); render();
   }catch(e){
+    if(silent) return;
     $('list').innerHTML = '<div class="msg">Couldn’t load fixtures.<br>'+esc(e.message||e)+'</div>';
     $('sub').textContent = 'Error';
   }
 }
+// ---- update checks: every 30 min, and when the app comes back to the foreground ----
+const CHECK_EVERY = 30 * 60 * 1000, MIN_GAP = 2 * 60 * 1000;
+function busy(){ return ['formOverlay','placeOverlay','teamOverlay','pinOverlay'].some(id => $(id).classList.contains('show')); }
+function showUpdate(msg, label, onGo){
+  $('updMsg').textContent = msg; $('updGo').textContent = label;
+  $('updGo').onclick = e => { if(onGo){ e.preventDefault(); onGo(); } };
+  $('upd').classList.add('show');
+}
+$('updX').onclick = () => { $('upd').classList.remove('show'); state.dismissed = state.pendingKey; };
+async function checkUpdates(){
+  if(!state.data || state.checking) return;
+  state.checking = true;
+  try{
+    const r = await call('getStamp', store.get('viewerCode'));
+    state.lastCheck = Date.now();
+    if(r.locked) return;
+    if(r.version !== state.codeVersion){                           // new code deployed: needs a page reload
+      state.pendingKey = 'v' + r.version;
+      if(state.dismissed !== state.pendingKey){
+        $('updGo').href = state.data.appUrl || '#'; $('updGo').target = '_top';
+        showUpdate('A new version of the app is available.', 'Reload', null);
+      }
+      return;
+    }
+    if(r.stamp !== state.data.stamp){                              // fixtures/locations/teams changed
+      if(busy()){
+        state.pendingKey = 'd' + r.stamp;
+        if(state.dismissed !== state.pendingKey) showUpdate('Fixtures have been updated.', 'Refresh', () => { $('upd').classList.remove('show'); load(true).then(() => toast('Fixtures updated')); });
+      } else {
+        await load(true); toast('Fixtures updated');
+      }
+    }
+  }catch(e){ /* offline or quota – try again next time */ }
+  finally{ state.checking = false; }
+}
+setInterval(checkUpdates, CHECK_EVERY);
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && Date.now() - (state.lastCheck || 0) > MIN_GAP) checkUpdates();
+});
+
 function updateSub(){
   if(!state.data) return;
   $('sub').textContent = 'Fixtures · updated ' + state.data.loadedAt + (state.pin ? ' · Admin' : '');

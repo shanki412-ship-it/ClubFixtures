@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -128,6 +128,28 @@ function getBootstrap(viewerCode) {
   return Object.assign({ locked: false }, payload_(s));
 }
 
+/**
+ * Cheap check the page calls every 30 min (and when it comes back to the foreground):
+ * the app version, and a fingerprint of everything the page shows.
+ */
+function getStamp(viewerCode) {
+  const s = getSettings_();
+  if (s.viewerCode && String(viewerCode || '').trim() !== s.viewerCode) return { locked: true };
+  return { version: appVersion_(), stamp: dataStamp_() };
+}
+
+function appVersion_() { return APP_VERSION + (BUILD.indexOf('__') === 0 ? '' : ' · ' + BUILD); }
+
+/** Fingerprint of the sheets the page displays (Settings without passwords). */
+function dataStamp_() {
+  const ss = SpreadsheetApp.getActive();
+  const parts = [getMatchesSheet_().getDataRange().getDisplayValues()];
+  [PLACES_SHEET, TEAMS_SHEET, DIV_SHEET].forEach(n => { const sh = ss.getSheetByName(n); parts.push(sh ? sh.getDataRange().getDisplayValues() : []); });
+  const st = ss.getSheetByName(SETTINGS_SHEET);
+  parts.push(st ? st.getDataRange().getDisplayValues().filter(r => !/password|pin|viewer code/i.test(r[0])) : []);
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(parts)));
+}
+
 function verifyAdmin(pin) {
   return isAdmin_(pin);
 }
@@ -203,7 +225,9 @@ function payload_(s) {
     clubName: s.clubName,
     title: s.title,
     homeLocation: s.homeLocation,
-    version: APP_VERSION + (BUILD.indexOf('__') === 0 ? '' : ' · ' + BUILD),
+    version: appVersion_(),
+    stamp: dataStamp_(),
+    appUrl: ScriptApp.getService().getUrl(),
     statuses: statuses,
     teams: teams,
     places: readPlaces_(),

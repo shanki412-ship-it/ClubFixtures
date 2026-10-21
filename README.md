@@ -140,6 +140,14 @@ Both functions are also in the sheet's **Fixtures App** menu.
 - The footer shows the version, e.g. `v1.8.0 · 21 Oct 2026 · 65d2fe6`. The date and commit are stamped
   automatically by each deploy; bump `APP_VERSION` in `src/Code.gs` for bigger releases.
 
+## Staying up to date
+
+The page checks for changes every 30 minutes and whenever it comes back to the foreground (e.g. reopened from
+the home screen):
+- **Fixtures, locations, teams or settings changed** → the list refreshes quietly ("Fixtures updated").
+  If an admin is in the middle of editing, a banner offers **Refresh** instead, so nothing is lost.
+- **A new version was deployed** → a banner offers **Reload** to load the new app.
+
 ## Good to know
 
 - **Changes made in the Apps Script editor get overwritten by the next deploy.** Make code changes here instead.
