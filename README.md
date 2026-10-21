@@ -87,7 +87,7 @@ Both functions are also in the sheet's **Fixtures App** menu.
 
 ## How it works
 
-- **Managers**: Upcoming / Results / All / Stats tabs, team filter (remembered on their phone), search,
+- **Managers**: Upcoming / Results / All / Stats tabs, a **Team ▼** dropdown (grouped U13–U19, remembered on their phone), search,
   tap a location to open Google Maps.
 - **List or Calendar** on every fixtures tab. Colour = venue (blue Home, orange Away);
   solid = confirmed (Scheduled/Confirmed/Played with a date), dashed = TBC / not scheduled.
