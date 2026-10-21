@@ -31,8 +31,10 @@ sheet menu **Fixtures App → Split time into Time + Location columns**. It adds
 moves the place names into it, leaves clean times, and turns date text into real dates.
 It's safe to run again. Until you run it, the app still reads the old format correctly.
 
-**Places tab** (created automatically, pre-filled with every location found): holds an address or
-Eircode for each place so the 📍 link opens the exact hall in Google Maps. Without one, the link
+**Places tab** (created automatically, pre-filled with every location found): `Place | Address or Eircode |
+Google Maps link`. With a link, 📍 opens that exact pin; otherwise it searches the address.
+Celbridge is pre-set to Scoil na Mainistreach, Oldtown Rd, Celbridge, with its map pin.
+**Home matches with no location use Settings → Home Location (Celbridge).** Without one, the link
 searches "<place>, Ireland". Admins normally manage this from the app's **Locations** tab instead.
 
 **Teams tab** (created automatically, pre-filled from the fixtures): `Our Team | Division | Manager`.

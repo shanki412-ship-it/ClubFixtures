@@ -296,7 +296,8 @@
     <h2 id="placeTitle">Add location</h2>
     <div class="fgrid">
       <div class="full"><label>Name (as used in fixtures)</label><input id="p_name" placeholder="e.g. Terenure"></div>
-      <div class="full"><label>Address or Eircode (for Google Maps)</label><input id="p_addr" placeholder="Street address or Eircode"></div>
+      <div class="full"><label>Address or Eircode</label><input id="p_addr" placeholder="Street address or Eircode"></div>
+      <div class="full"><label>Google Maps link (optional – exact pin)</label><input id="p_link" type="url" inputmode="url" placeholder="Paste from Google Maps → Share → Copy link"></div>
     </div>
     <label class="check" id="p_renameWrap"><input type="checkbox" id="p_rename" checked> <span id="p_renameTxt">Also rename it in matches</span></label>
     <div class="hint"><a href="#" id="p_test" target="_blank" style="color:var(--brand)">Check it in Google Maps ↗</a></div>
@@ -384,9 +385,12 @@ function shortTeam(t){
 function teamInfo(team){ return (state.data.teamInfo || []).find(t => t.team === team) || null; }
 function divisionOf(team){ const t = teamInfo(team); return t ? t.division : ''; }
 function managerOf(team){ const t = teamInfo(team); return t ? t.manager : ''; }
-function mapsQuery(place){
+// Exact pin if the location has a Google Maps link, otherwise a search for its address (or name)
+function mapsHref(place){
   const p = (state.data.placeList || []).find(x => x.name.toLowerCase() === (place||'').toLowerCase());
-  return (p && p.address) || state.data.places[(place||'').toLowerCase()] || (place + ', Ireland');
+  if(p && p.link) return p.link;
+  const q = (p && p.address) || state.data.places[(place||'').toLowerCase()] || (place + ', Ireland');
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
 }
 
 // ---- load ----
@@ -485,7 +489,7 @@ function rowHTML(m){
 
   let loc = '';
   if(NO_MAP.indexOf(pk) < 0){
-    loc = '<a target="_blank" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(mapsQuery(m.place))+'">📍 '+esc(m.place)+' – open in Maps</a>';
+    loc = '<a target="_blank" href="'+esc(mapsHref(m.place))+'">📍 '+esc(m.place)+' – open in Maps</a>';
   } else loc = '📍 ' + (pk === 'internal' ? 'Internal' : 'Location TBC');
   const fixture = (m.homeTeam && m.awayTeam) ? esc(m.homeTeam)+' v '+esc(m.awayTeam) : esc(m.ourTeam)+' v '+esc(m.opponent);
   const details =
@@ -744,7 +748,8 @@ function renderPlaces(){
   html += list.map(p => {
     const n = use[p.name.toLowerCase()] || 0;
     return '<div class="loc" data-name="'+esc(p.name)+'"><div class="grow"><div class="nm">'+esc(p.name)+'</div>'+
-      '<div class="ad'+(p.address?'':' missing')+'">'+(p.address ? esc(p.address) : 'No address yet')+'</div></div>'+
+      '<div class="ad'+(p.address||p.link?'':' missing')+'">'+(p.link ? '📌 ' : '')+(p.address ? esc(p.address) : p.link ? 'Map pin set' : 'No address yet')+
+      (state.data.homeLocation && p.name.toLowerCase() === state.data.homeLocation.toLowerCase() ? ' · <b>Home</b>' : '')+'</div></div>'+
       '<div class="cnt">'+n+' match'+(n===1?'':'es')+'</div></div>';
   }).join('') || '<div class="empty">No locations yet. Tap + Add location.</div>';
   if(unlisted.length){
@@ -766,6 +771,7 @@ function openPlace(p, presetName){
   $('placeTitle').textContent = p ? 'Edit location' : 'Add location';
   $('p_name').value = p ? p.name : (presetName || '');
   $('p_addr').value = p ? p.address : '';
+  $('p_link').value = p ? (p.link || '') : '';
   $('pDel').style.display = p ? '' : 'none';
   const n = p ? (placeUsage()[p.name.toLowerCase()] || 0) : 0;
   $('p_renameWrap').style.display = 'none';
@@ -778,13 +784,14 @@ function openPlace(p, presetName){
 }
 function updateMapTest(){
   const q = $('p_addr').value.trim() || ($('p_name').value.trim() + ', Ireland');
-  $('p_test').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
+  $('p_test').href = $('p_link').value.trim() || ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q));
   const p = state.editPlace;
   const renamed = p && $('p_name').value.trim().toLowerCase() !== p.name.toLowerCase() && Number($('p_renameWrap').dataset.count) > 0;
   $('p_renameWrap').style.display = renamed ? '' : 'none';
 }
 $('p_name').addEventListener('input', updateMapTest);
 $('p_addr').addEventListener('input', updateMapTest);
+$('p_link').addEventListener('input', updateMapTest);
 $('pCancel').onclick = () => $('placeOverlay').classList.remove('show');
 $('pSave').onclick = async () => {
   const name = $('p_name').value.trim();
@@ -793,7 +800,7 @@ $('pSave').onclick = async () => {
   try{
     const p = state.editPlace;
     state.data = await call('savePlace', state.pin, p ? p.name : '', name, $('p_addr').value.trim(),
-      $('p_renameWrap').style.display !== 'none' && $('p_rename').checked);
+      $('p_renameWrap').style.display !== 'none' && $('p_rename').checked, $('p_link').value.trim());
     $('placeOverlay').classList.remove('show'); render(); toast('Location saved');
   }catch(err){ $('placeErr').textContent = err.message || err; }
   $('pSave').disabled = false;
@@ -895,6 +902,7 @@ function syncHomeAway(){
   if(v==='away'){ $('f_homeTeam').value = them; $('f_awayTeam').value = us; }
 }
 function homeVenue(){
+  if(state.data.homeLocation) return state.data.homeLocation;
   const c = {};
   state.data.matches.forEach(m => { if(side(m)==='home' && m.place) c[m.place] = (c[m.place]||0) + 1; });
   return Object.keys(c).sort((a,b) => c[b]-c[a])[0] || '';

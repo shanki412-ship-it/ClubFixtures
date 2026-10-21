@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -42,7 +42,15 @@ const DEFAULT_SETTINGS = [
   ['App Title', 'ACBC Juvenile League 2026-27', 'Title at the top of the app'],
   ['Admin Passwords', '', 'One per admin, separated by commas (letters/numbers, e.g. Shuttle24, Smash99). Case-sensitive. Blank = editing disabled'],
   ['Viewer Code', '', 'Optional code managers enter once to view. Blank = anyone with the link'],
+  ['Home Location', 'Celbridge', 'Location used for home matches that have no location filled in'],
   ['Statuses', 'Not Scheduled, Scheduled, Confirmed, Postponed, Cancelled, Played', 'Options in the status dropdown']
+];
+
+// Filled into the Places tab when the place is missing or its address/link is blank (admin edits are kept).
+const DEFAULT_PLACES = [
+  { name: 'Celbridge',
+    address: 'Scoil na Mainistreach, Oldtown Rd, Oakleypark, Celbridge, Co. Kildare',
+    link: 'https://maps.app.goo.gl/41RpdT8dCLgGDKfJ9' }
 ];
 
 const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
@@ -162,6 +170,7 @@ function payload_(s) {
   return {
     clubName: s.clubName,
     title: s.title,
+    homeLocation: s.homeLocation,
     version: APP_VERSION + (BUILD.indexOf('__') === 0 ? '' : ' · ' + BUILD),
     statuses: statuses,
     teams: teams,
@@ -182,6 +191,7 @@ function readMatches_() {
   if (values.length < 2) return [];
   const map = headerMap_(values[0]);
   const tz = Session.getScriptTimeZone();
+  const homeLoc = getSettings_().homeLocation;
   const cell = (i, key) => map[key] === undefined ? '' : String(display[i][map[key]]).trim();
   const out = [];
   for (let i = 1; i < values.length; i++) {
@@ -196,6 +206,7 @@ function readMatches_() {
     const t = splitTimeCell_(cell(i, 'time'));
     m.time = t.time;
     m.place = map.location !== undefined && cell(i, 'location') ? cell(i, 'location') : t.place;
+    if (!m.place && /^home/i.test(m.venue) && homeLoc) m.place = homeLoc;   // default for home matches
     out.push(m);
   }
   return out;
@@ -323,7 +334,7 @@ function readPlaceList_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(PLACES_SHEET);
   if (!sh) return [];
   return sh.getDataRange().getDisplayValues().slice(1)
-    .map((r, i) => ({ name: String(r[0]).trim(), address: String(r[1]).trim(), row: i + 2 }))
+    .map((r, i) => ({ name: String(r[0]).trim(), address: String(r[1]).trim(), link: String(r[2] || '').trim(), row: i + 2 }))
     .filter(p => p.name);
 }
 
@@ -331,7 +342,11 @@ function readPlaceList_() {
  * Adds or edits a location in the Places tab. If an existing location is renamed and
  * renameMatches is true, matches using the old name are updated too.
  */
-function savePlace(pin, original, name, address, renameMatches) {
+function savePlace(pin, original, name, address, renameMatches, link) {
+  link = String(link || '').trim().slice(0, 500);
+  if (link && !/^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|(www\.)?google\.[a-z.]+\/maps)/i.test(link)) {
+    throw new Error('The map link must be a Google Maps link (from Share → Copy link).');
+  }
   assertAdmin_(pin);
   name = String(name || '').trim().slice(0, 100);
   address = String(address || '').trim().slice(0, 300);
@@ -348,8 +363,8 @@ function savePlace(pin, original, name, address, renameMatches) {
       throw new Error('There is already a location called "' + name + '".');
     }
     const existing = original ? list.find(p => p.name.toLowerCase() === origLower) : null;
-    if (existing) sh.getRange(existing.row, 1, 1, 2).setValues([[name, address]]);
-    else sh.appendRow([name, address]);
+    if (existing) sh.getRange(existing.row, 1, 1, 3).setValues([[name, address, link]]);
+    else sh.appendRow([name, address, link]);
 
     if (existing && renameMatches && origLower !== lower) renamePlaceInMatches_(origLower, name);
     SpreadsheetApp.flush();
@@ -408,9 +423,10 @@ function readPlaces_() {
 /** Creates the Places tab once, pre-filled with every place found in the fixtures. */
 function ensurePlaces_() {
   const ss = SpreadsheetApp.getActive();
-  if (ss.getSheetByName(PLACES_SHEET)) return;
+  const existingSheet = ss.getSheetByName(PLACES_SHEET);
+  if (existingSheet) { fillDefaultPlaces_(existingSheet); return; }
   const sh = ss.insertSheet(PLACES_SHEET);
-  sh.getRange(1, 1, 1, 2).setValues([['Place', 'Address or Eircode (for Google Maps)']]).setFontWeight('bold');
+  sh.getRange(1, 1, 1, 3).setValues([['Place', 'Address or Eircode', 'Google Maps link (optional)']]).setFontWeight('bold');
   const skip = ['', 'tbc', 'internal'];
   const seen = {};
   readMatches_().forEach(m => {
@@ -419,7 +435,23 @@ function ensurePlaces_() {
   });
   const rows = Object.keys(seen).sort().map(k => [seen[k], '']);
   if (rows.length) sh.getRange(2, 1, rows.length, 2).setValues(rows);
-  sh.setColumnWidth(1, 160); sh.setColumnWidth(2, 420);
+  sh.setColumnWidth(1, 160); sh.setColumnWidth(2, 420); sh.setColumnWidth(3, 300);
+  fillDefaultPlaces_(sh);
+}
+
+/** Adds the link column header if missing, and fills DEFAULT_PLACES into blank cells only. */
+function fillDefaultPlaces_(sh) {
+  if (!String(sh.getRange(1, 3).getDisplayValue()).trim()) {
+    sh.getRange(1, 3).setValue('Google Maps link (optional)').setFontWeight('bold');
+    sh.setColumnWidth(3, 300);
+  }
+  const list = readPlaceList_();
+  DEFAULT_PLACES.forEach(d => {
+    const p = list.find(x => x.name.toLowerCase() === d.name.toLowerCase());
+    if (!p) { sh.appendRow([d.name, d.address, d.link]); return; }
+    if (!p.address) sh.getRange(p.row, 2).setValue(d.address);
+    if (!p.link) sh.getRange(p.row, 3).setValue(d.link);
+  });
 }
 
 /* ---------------- Teams & divisions ---------------- */
@@ -662,6 +694,7 @@ function getSettings_() {
   return {
     clubName: kv['club name'] || 'ACBC',
     title: kv['app title'] || 'ACBC Juvenile League 2026-27',
+    homeLocation: kv['home location'] || 'Celbridge',
     adminPins: list(kv['admin passwords'] || kv['admin pins']),
     viewerCode: kv['viewer code'] || '',
     statuses: list(kv['statuses'] || DEFAULT_SETTINGS.find(r => r[0] === 'Statuses')[1])
