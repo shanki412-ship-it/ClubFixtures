@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.13.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -234,6 +234,7 @@ function payload_(s) {
     placeList: readPlaceList_(),
     teamInfo: readTeamInfo_(),
     divisions: readDivisions_(),
+    oppInfo: readOpponentInfo_(),
     matches: matches,
     loadedAt: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm')
   };
@@ -535,12 +536,12 @@ function guessDivision_(team) {
 function ensureTeamSheets_() {
   const ss = SpreadsheetApp.getActive();
   const needTeams = !ss.getSheetByName(TEAMS_SHEET), needDivs = !ss.getSheetByName(DIV_SHEET);
-  if (!needTeams && !needDivs) { fillDefaultManagers_(); return; }
+  if (!needTeams && !needDivs) { addContactHeaders_(); fillDefaultManagers_(); return; }
   const matches = readMatches_();
   const ours = Array.from(new Set(matches.map(m => m.ourTeam).filter(Boolean))).sort();
   if (needTeams) {
     const sh = ss.insertSheet(TEAMS_SHEET);
-    sh.getRange(1, 1, 1, 3).setValues([['Our Team', 'Division', 'Manager']]).setFontWeight('bold');
+    sh.getRange(1, 1, 1, 4).setValues([['Our Team', 'Division', 'Manager', 'Manager Phone']]).setFontWeight('bold');
     if (ours.length) sh.getRange(2, 1, ours.length, 3).setValues(ours.map(t => [t, guessDivision_(t), '']));
     sh.setColumnWidth(1, 200); sh.setColumnWidth(2, 180); sh.setColumnWidth(3, 200);
     sh.setFrozenRows(1);
@@ -558,11 +559,30 @@ function ensureTeamSheets_() {
     });
     rows.sort((a, b) => a[0] === b[0] ? a[1].localeCompare(b[1]) : a[0].localeCompare(b[0]));
     const sh = ss.insertSheet(DIV_SHEET);
-    sh.getRange(1, 1, 1, 2).setValues([['Division', 'Team']]).setFontWeight('bold');
+    sh.getRange(1, 1, 1, 4).setValues([['Division', 'Team', 'Team Manager', 'Manager Phone']]).setFontWeight('bold');
     if (rows.length) sh.getRange(2, 1, rows.length, 2).setValues(rows);
     sh.setColumnWidth(1, 180); sh.setColumnWidth(2, 220);
     sh.setFrozenRows(1);
   }
+}
+
+/** Older sheets: add the manager/phone header cells if they're missing (data untouched). */
+function addContactHeaders_() {
+  const ss = SpreadsheetApp.getActive();
+  [[TEAMS_SHEET, [[3, 'Manager'], [4, 'Manager Phone']]], [DIV_SHEET, [[3, 'Team Manager'], [4, 'Manager Phone']]]].forEach(([n, cols]) => {
+    const sh = ss.getSheetByName(n);
+    if (!sh) return;
+    cols.forEach(([c, label]) => {
+      if (!String(sh.getRange(1, c).getDisplayValue()).trim()) { sh.getRange(1, c).setValue(label).setFontWeight('bold'); sh.setColumnWidth(c, 160); }
+    });
+  });
+}
+
+/** Phone numbers: digits, spaces, + ( ) - only. */
+function cleanPhone_(p) {
+  p = String(p || '').trim().slice(0, 25);
+  if (p && !/^[0-9+()\-\s]{6,25}$/.test(p)) throw new Error('Phone number can only contain digits, spaces, + ( ) -');
+  return p;
 }
 
 /** Fills DEFAULT_MANAGERS into blank Manager cells only. */
@@ -579,7 +599,8 @@ function readTeamInfo_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(TEAMS_SHEET);
   if (!sh) return [];
   return sh.getDataRange().getDisplayValues().slice(1)
-    .map((r, i) => ({ team: String(r[0]).trim(), division: String(r[1]).trim(), manager: String(r[2] || '').trim(), row: i + 2 }))
+    .map((r, i) => ({ team: String(r[0]).trim(), division: String(r[1]).trim(), manager: String(r[2] || '').trim(),
+                      phone: String(r[3] || '').trim(), row: i + 2 }))
     .filter(t => t.team);
 }
 
@@ -594,6 +615,39 @@ function readDivisions_() {
   });
   Object.keys(out).forEach(d => out[d].sort((a, b) => a.localeCompare(b)));
   return out;
+}
+
+/** Opponent contacts: [{ division, team, manager, phone }] from the Divisions tab. */
+function readOpponentInfo_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(DIV_SHEET);
+  if (!sh) return [];
+  return sh.getDataRange().getDisplayValues().slice(1)
+    .map(r => ({ division: String(r[0]).trim(), team: String(r[1]).trim(), manager: String(r[2] || '').trim(), phone: String(r[3] || '').trim() }))
+    .filter(o => o.division && o.team && (o.manager || o.phone));
+}
+
+/** Set the manager name and phone for a team in a division (normally an opponent). */
+function saveOpponent(pin, division, team, manager, phone) {
+  assertAdmin_(pin);
+  manager = String(manager || '').trim().slice(0, 100);
+  phone = cleanPhone_(phone);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    addContactHeaders_();
+    addToDivision_(division, team);
+    const sh = SpreadsheetApp.getActive().getSheetByName(DIV_SHEET);
+    const rows = sh.getDataRange().getDisplayValues();
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === division && String(rows[i][1]).trim().toLowerCase() === String(team).trim().toLowerCase()) {
+        sh.getRange(i + 1, 3, 1, 2).setNumberFormat('@').setValues([[manager, phone]]);
+      }
+    }
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+  return payload_(getSettings_());
 }
 
 function divisionOfTeam_(team) {
@@ -612,7 +666,8 @@ function addToDivision_(division, team) {
 }
 
 /** Add or edit one of our teams (manager, division). */
-function saveTeam(pin, original, team, division, manager) {
+function saveTeam(pin, original, team, division, manager, phone) {
+  phone = cleanPhone_(phone);
   assertAdmin_(pin);
   team = String(team || '').trim().slice(0, 100);
   division = String(division || '').trim().slice(0, 100);
@@ -631,8 +686,10 @@ function saveTeam(pin, original, team, division, manager) {
     if (!existing && list.some(t => t.team.toLowerCase() === team.toLowerCase())) {
       throw new Error('There is already a team called "' + team + '".');
     }
-    if (existing) sh.getRange(existing.row, 1, 1, 3).setValues([[existing.team, division, manager]]);
-    else sh.appendRow([team, division, manager]);
+    addContactHeaders_();
+    const row = existing ? existing.row : sh.getLastRow() + 1;
+    sh.getRange(row, 4).setNumberFormat('@');                // keep leading 0 in phone numbers
+    sh.getRange(row, 1, 1, 4).setValues([[existing ? existing.team : team, division, manager, phone]]);
     addToDivision_(division, existing ? existing.team : team);
     SpreadsheetApp.flush();
   } finally {

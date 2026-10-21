@@ -38,11 +38,12 @@ Celbridge is pre-set to Scoil na Mainistreach, Oldtown Rd, Celbridge, with its m
 **Home matches with no location use Settings → Home Location (Celbridge).** Without one, the link
 searches "<place>, Ireland". Admins normally manage this from the app's **Locations** tab instead.
 
-**Teams tab** (created automatically, pre-filled from the fixtures): `Our Team | Division | Manager`.
+**Teams tab** (created automatically, pre-filled from the fixtures): `Our Team | Division | Manager | Manager Phone`.
 The manager's name shows under the Team dropdown and in each match's details.
 
-**Divisions tab** (created automatically, pre-filled from the fixtures): `Division | Team`, one row per team in
-each division (ours and opponents). The match form's **Opponent** dropdown lists the teams in our team's division,
+**Divisions tab** (created automatically, pre-filled from the fixtures): `Division | Team | Team Manager |
+Manager Phone`, one row per team in each division (ours and opponents). An opponent's manager and phone show in
+the details of every match against that team, with tap-to-call. The match form's **Opponent** dropdown lists the teams in our team's division,
 with an *Other…* option; a new opponent typed there is added to the division automatically.
 
 Admins normally manage both from the app: **Admin → Teams & managers**.
@@ -165,3 +166,5 @@ the home screen):
 - Passwords are checked on the server for every edit; a wrong one adds a delay to slow guessing.
 - Changing or removing a password in Settings signs that admin out on their next visit.
 - Password/link security is fine for fixtures; it isn't bank-grade.
+- Manager phone numbers are visible to everyone with the app link. Set a **Viewer Code** in Settings if the
+  link may travel beyond team managers.

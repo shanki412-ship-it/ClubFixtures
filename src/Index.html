@@ -167,6 +167,9 @@
   .ours .mg.missing{color:var(--s-warn)}
   .opps{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
   .opp-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:3px 4px 3px 10px;font-size:12.5px}
+  .opp-chip .on{border:0;background:none;color:var(--ink);padding:0;font-size:12.5px;cursor:pointer;width:auto;height:auto}
+  .opp-chip .on .ph{color:var(--accent);font-weight:700}
+  .r2 .tel{color:var(--accent);font-weight:700;text-decoration:none;white-space:nowrap}
   .opp-chip button{border:0;background:var(--soft);color:var(--muted);border-radius:999px;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:1}
   .opp-add{border:1.5px dashed var(--brand);color:var(--brand);background:transparent;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:600;cursor:pointer}
   .other{margin-top:6px;display:none}
@@ -341,13 +344,31 @@
     <div class="fgrid">
       <div class="full"><label>Our team</label><input id="t_name"></div>
       <div class="full"><label>Division (teams in the same division can be opponents)</label><input id="t_div" list="divDL" placeholder="e.g. U15 Mixed Div 2"></div>
-      <div class="full"><label>Team manager</label><input id="t_mgr" placeholder="Manager's name" autocomplete="off"></div>
+      <div><label>Team manager</label><input id="t_mgr" placeholder="Manager's name" autocomplete="off"></div>
+      <div><label>Manager phone</label><input id="t_phone" type="tel" inputmode="tel" placeholder="e.g. 087 123 4567" autocomplete="off"></div>
     </div>
     <datalist id="divDL"></datalist>
     <div class="err" id="teamErr"></div>
     <div class="row">
       <button class="btn ghost" id="tCancel">Cancel</button>
       <button class="btn primary" id="tSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Opponent contact form -->
+<div class="overlay" id="oppOverlay">
+  <div class="sheet">
+    <h2 id="oppTitle">Opponent</h2>
+    <div class="hint" id="oppDiv" style="margin-top:-6px"></div>
+    <div class="fgrid">
+      <div><label>Their team manager</label><input id="o_mgr" placeholder="Manager's name" autocomplete="off"></div>
+      <div><label>Manager phone</label><input id="o_phone" type="tel" inputmode="tel" placeholder="e.g. 087 123 4567" autocomplete="off"></div>
+    </div>
+    <div class="err" id="oppErr"></div>
+    <div class="row">
+      <button class="btn ghost" id="oCancel">Cancel</button>
+      <button class="btn primary" id="oSave">Save</button>
     </div>
   </div>
 </div>
@@ -409,6 +430,13 @@ function shortTeam(t){
 function teamInfo(team){ return (state.data.teamInfo || []).find(t => t.team === team) || null; }
 function divisionOf(team){ const t = teamInfo(team); return t ? t.division : ''; }
 function managerOf(team){ const t = teamInfo(team); return t ? t.manager : ''; }
+// Opponent contact: same division as our team first, then any division with that team name
+function oppContact(ourTeam, opponent){
+  const list = state.data.oppInfo || [], k = (opponent||'').toLowerCase(), d = divisionOf(ourTeam);
+  return list.find(o => o.team.toLowerCase() === k && o.division === d) || list.find(o => o.team.toLowerCase() === k) || null;
+}
+function telLink(phone){ return phone ? ' · <a class="tel" href="tel:'+esc(phone.replace(/[^0-9+]/g,''))+'">📞 '+esc(phone)+'</a>' : ''; }
+function contactLine(label, name, phone){ return (name || phone) ? '<div>'+label+': <b>'+esc(name || '—')+'</b>'+telLink(phone)+'</div>' : ''; }
 // Exact pin if the location has a Google Maps link, otherwise a search for its address (or name)
 function mapsHref(place){
   const p = (state.data.placeList || []).find(x => x.name.toLowerCase() === (place||'').toLowerCase());
@@ -440,7 +468,7 @@ async function load(silent){
 }
 // ---- update checks: every 30 min, and when the app comes back to the foreground ----
 const CHECK_EVERY = 30 * 60 * 1000, MIN_GAP = 2 * 60 * 1000;
-function busy(){ return ['formOverlay','placeOverlay','teamOverlay','pinOverlay'].some(id => $(id).classList.contains('show')); }
+function busy(){ return ['formOverlay','placeOverlay','teamOverlay','pinOverlay','oppOverlay'].some(id => $(id).classList.contains('show')); }
 function showUpdate(msg, label, onGo){
   $('updMsg').textContent = msg; $('updGo').textContent = label;
   $('updGo').onclick = e => { if(onGo){ e.preventDefault(); onGo(); } };
@@ -564,7 +592,8 @@ function rowHTML(m){
     '<div>'+(isISO(m.date) ? dayLabel(m.date) : esc(m.dateNote||'Date TBC'))+(m.time?' · '+esc(m.time):'')+
       ' · '+(s==='home'?'Home':s==='away'?'Away':esc(m.venue||'—'))+' · '+esc(m.status||'—')+'</div>'+
     (r ? '<div>Result: <b>'+({W:'Won',L:'Lost',D:'Draw'})[r]+(m.score?' '+esc(m.score):'')+'</b></div>' : '')+
-    (managerOf(m.ourTeam) ? '<div>Manager ('+esc(m.ourTeam)+'): <b>'+esc(managerOf(m.ourTeam))+'</b></div>' : '')+
+    contactLine('Our manager', managerOf(m.ourTeam), (teamInfo(m.ourTeam)||{}).phone)+
+    (o => o ? contactLine(esc(m.opponent)+' manager', o.manager, o.phone) : '')(oppContact(m.ourTeam, m.opponent))+
     '<div>'+loc+'</div>'+
     (state.pin ? '<button class="editbtn" data-edit="'+m.row+'">Edit match</button>' : '');
 
@@ -751,15 +780,19 @@ function renderTeamsAdmin(){
   const names = [...new Set([...Object.keys(divs), ...info.map(t => t.division).filter(Boolean)])].sort();
   const noDiv = state.data.teams.filter(t => !divisionOf(t));
   let html = adminSeg() + '<div class="hint">Each division lists the teams in it. The match form’s Opponent dropdown '+
-    'shows the teams in our team’s division. Tap our team to set its manager.</div>';
+    'shows the teams in our team’s division. Tap our team, or an opponent, to add the manager’s name and phone.</div>';
   names.forEach(d => {
     const ourHere = info.filter(t => t.division === d);
     const others = (divs[d] || []).filter(t => !ours.has(t.toLowerCase()) && !ourHere.some(o => o.team.toLowerCase() === t.toLowerCase()));
     html += '<div class="div"><h3>'+esc(d)+'</h3>' +
       ourHere.map(t => '<div class="ours" data-team="'+esc(t.team)+'"><span class="nm">'+esc(t.team)+'</span>'+
-        '<span class="mg'+(t.manager?'':' missing')+'">'+(t.manager ? '👤 '+esc(t.manager) : 'Add manager')+'</span></div>').join('') +
-      '<div class="opps">' + others.map(o => '<span class="opp-chip">'+esc(o)+
-        '<button title="Remove from division" data-div="'+esc(d)+'" data-rm="'+esc(o)+'">✕</button></span>').join('') +
+        '<span class="mg'+(t.manager?'':' missing')+'">'+(t.manager ? '👤 '+esc(t.manager)+(t.phone ? ' · 📞' : '') : 'Add manager')+'</span></div>').join('') +
+      '<div class="opps">' + others.map(o => {
+        const c = (state.data.oppInfo||[]).find(x => x.division === d && x.team.toLowerCase() === o.toLowerCase());
+        return '<span class="opp-chip"><button class="on" title="Manager & phone" data-odiv="'+esc(d)+'" data-oteam="'+esc(o)+'">'+esc(o)+
+          (c ? ' <span class="ph">👤'+(c.phone ? '📞' : '')+'</span>' : '')+'</button>'+
+          '<button title="Remove from division" data-div="'+esc(d)+'" data-rm="'+esc(o)+'">✕</button></span>';
+      }).join('') +
       '<button class="opp-add" data-add="'+esc(d)+'">+ Add team</button></div></div>';
   });
   if(noDiv.length){
@@ -769,6 +802,7 @@ function renderTeamsAdmin(){
   $('list').innerHTML = html;
   wireAdminSeg();
   $('list').querySelectorAll('.ours').forEach(el => el.onclick = () => openTeam(el.dataset.team));
+  $('list').querySelectorAll('[data-oteam]').forEach(b => b.onclick = () => openOpp(b.dataset.odiv, b.dataset.oteam));
   $('list').querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => {
     if(!confirm('Remove '+b.dataset.rm+' from '+b.dataset.div+'? (Matches are not changed.)')) return;
     try{ state.data = await call('removeDivisionTeam', state.pin, b.dataset.div, b.dataset.rm); render(); toast('Removed'); }
@@ -787,6 +821,7 @@ function openTeam(team){
   $('t_name').value = t ? t.team : ''; $('t_name').disabled = !!t;
   $('t_div').value = t ? t.division : '';
   $('t_mgr').value = t ? t.manager : '';
+  $('t_phone').value = t ? (t.phone || '') : '';
   const divNames = [...new Set([...Object.keys(state.data.divisions||{}), ...(state.data.teamInfo||[]).map(x => x.division)].filter(Boolean))].sort();
   $('divDL').innerHTML = divNames.map(d => '<option value="'+esc(d)+'">').join('');
   $('teamErr').textContent = '';
@@ -794,11 +829,32 @@ function openTeam(team){
   setTimeout(() => (t ? $('t_mgr') : $('t_name')).focus(), 50);
 }
 $('tCancel').onclick = () => $('teamOverlay').classList.remove('show');
+
+function openOpp(division, team){
+  const c = (state.data.oppInfo||[]).find(x => x.division === division && x.team.toLowerCase() === team.toLowerCase()) || {};
+  state.editOpp = { division, team };
+  $('oppTitle').textContent = team;
+  $('oppDiv').textContent = division + ' · shown in the details of every match against this team';
+  $('o_mgr').value = c.manager || ''; $('o_phone').value = c.phone || '';
+  $('oppErr').textContent = '';
+  $('oppOverlay').classList.add('show');
+  setTimeout(() => $('o_mgr').focus(), 50);
+}
+$('oCancel').onclick = () => $('oppOverlay').classList.remove('show');
+$('oSave').onclick = async () => {
+  const o = state.editOpp; if(!o) return;
+  $('oSave').disabled = true; $('oppErr').textContent = 'Saving…';
+  try{
+    state.data = await call('saveOpponent', state.pin, o.division, o.team, $('o_mgr').value.trim(), $('o_phone').value.trim());
+    $('oppOverlay').classList.remove('show'); render(); toast('Saved');
+  }catch(err){ $('oppErr').textContent = err.message || err; }
+  $('oSave').disabled = false;
+};
 $('tSave').onclick = async () => {
   const t = state.editTeam;
   $('tSave').disabled = true; $('teamErr').textContent = 'Saving…';
   try{
-    state.data = await call('saveTeam', state.pin, t ? t.team : '', $('t_name').value.trim(), $('t_div').value.trim(), $('t_mgr').value.trim());
+    state.data = await call('saveTeam', state.pin, t ? t.team : '', $('t_name').value.trim(), $('t_div').value.trim(), $('t_mgr').value.trim(), $('t_phone').value.trim());
     $('teamOverlay').classList.remove('show'); renderChips(); render(); toast('Team saved');
   }catch(err){ $('teamErr').textContent = err.message || err; }
   $('tSave').disabled = false;
@@ -1056,7 +1112,7 @@ document.querySelectorAll('#mode button').forEach(b => b.onclick = () => {
 });
 $('search').oninput = e => { state.q = e.target.value; if(state.data) render(); };
 $('refreshBtn').onclick = () => load();
-[$('pinOverlay'), $('formOverlay'), $('placeOverlay'), $('teamOverlay')].forEach(o => o.addEventListener('click', e => { if(e.target === o) o.classList.remove('show'); }));
+[$('pinOverlay'), $('formOverlay'), $('placeOverlay'), $('teamOverlay'), $('oppOverlay')].forEach(o => o.addEventListener('click', e => { if(e.target === o) o.classList.remove('show'); }));
 
 state.team = store.get('myTeam');
 if(store.get('viewMode') === 'cal'){ state.mode = 'cal'; document.querySelectorAll('#mode button').forEach(x => x.classList.toggle('on', x.dataset.mode==='cal')); }
