@@ -688,8 +688,7 @@ function setAdmin(pin, remember){
 $('adminBtn').onclick = () => {
   if(state.pin){ if(confirm('Sign out of admin?')){ setAdmin(''); toast('Signed out'); } return; }
   $('pinInput').value=''; $('pinRemember').checked = false;
-  $('pinErr').textContent = state.data && !state.data.adminEnabled
-    ? 'No admin password is set yet. In the Google Sheet, open the Settings tab and type a password in the Value column next to "Admin Passwords".' : '';
+  $('pinErr').textContent = '';
   $('pinOverlay').classList.add('show'); setTimeout(()=>$('pinInput').focus(),50);
 };
 $('pinCancel').onclick = () => $('pinOverlay').classList.remove('show');

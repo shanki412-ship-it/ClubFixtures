@@ -152,7 +152,6 @@ function payload_(s) {
   const teams = Array.from(new Set(matches.map(m => m.ourTeam).filter(Boolean))).sort();
   return {
     clubName: s.clubName,
-    adminEnabled: s.adminPins.length > 0,
     statuses: statuses,
     teams: teams,
     places: readPlaces_(),
