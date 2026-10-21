@@ -14,6 +14,7 @@ Team managers open one link to see matches; admins unlock editing with a PIN.
 - `Time`: HH:MM, or blank
 - `Date`: a real date (shown as 1-Nov-2026), or a note such as **TBC** or **Internal**
 - `Location`: where it's played (Celbridge, Terenure, Kadka…), or TBC / Internal
+- `Result`: Won / Lost / Draw (blank until played) · `Score`: e.g. 5-3 — both columns are added automatically
 - Extra columns are fine — the app ignores them and never overwrites them.
 
 **Converting the current sheet** (where `time` holds "Celbridge @ 18:00"): after setup, use the
@@ -51,11 +52,19 @@ After code changes: **Deploy → Manage deployments → Edit → New version** (
 
 ## How it works
 
-- **Managers**: Upcoming / Results / All tabs, team filter (remembered on their phone), search,
+- **Managers**: Upcoming / Results / All / Stats tabs, team filter (remembered on their phone), search,
   tap a location to open Google Maps.
+- **List or Calendar** on every fixtures tab. Colour = venue (blue Home, orange Away);
+  solid = confirmed (Scheduled/Confirmed/Played with a date), dashed = TBC / not scheduled.
+  Tap a calendar day to see its matches; undated fixtures are listed under the calendar.
+- **Stats**: played / won / lost / drawn / win rate, wins-vs-losses bar, home vs away record,
+  a per-team table with last-5 form, and how many remaining fixtures are confirmed vs TBC.
+  Follows the team filter.
 - **Admins**: tap 🔒, enter PIN → tap any match to edit or delete, **+ Add match** to create.
   Choosing Home/Away auto-fills Home Team / Away Team, and Home pre-fills your usual home location.
   Use the date picker, or pick TBC / Internal when there's no date yet.
+  Enter the Result and Score after a match; picking a result sets Status to Played.
+  A match with a result moves to the Results tab and counts in Stats.
 - Edits write straight into the sheet; admins can also keep editing the sheet directly.
 - If someone changed a row in the sheet after the app loaded, the save is blocked with
   "refresh and try again", so nobody overwrites anyone else's change.

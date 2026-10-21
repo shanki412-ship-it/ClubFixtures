@@ -7,6 +7,8 @@
  *   Our Team | Opponent | Venue | Home Team | Away Team | Status | Time | Date | Location
  *   - Venue: Home / Away;  Time: HH:MM;  Date: a date, or a note like TBC / Internal
  *   - Location: where it's played (Celbridge, Terenure…), TBC or Internal
+ *   - Result: Won / Lost / Draw (blank until played);  Score: free text, e.g. 5-3
+ *     (both columns are added automatically if missing)
  * Older sheets with "Celbridge @ 18:00" in the time column still read correctly;
  * run splitIntoSeparateColumns() once to convert them.
  */
@@ -24,9 +26,11 @@ const FIELDS = [
   { key: 'status',   header: 'status' },
   { key: 'time',     header: 'time' },
   { key: 'date',     header: 'date' },
-  { key: 'location', header: 'location' }
+  { key: 'location', header: 'location' },
+  { key: 'result',   header: 'result' },
+  { key: 'score',    header: 'score' }
 ];
-const TEXT_FIELDS = ['ourTeam', 'opponent', 'venue', 'homeTeam', 'awayTeam', 'status'];
+const TEXT_FIELDS = ['ourTeam', 'opponent', 'venue', 'homeTeam', 'awayTeam', 'status', 'result', 'score'];
 
 const DEFAULT_SETTINGS = [
   ['Club Name', 'My Club', 'Shown at the top of the app'],
@@ -42,6 +46,7 @@ const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8,
 function doGet() {
   ensureSettings_();
   ensurePlaces_();
+  ensureResultColumns_();
   return HtmlService.createTemplateFromFile('Index')
     .evaluate()
     .setTitle(getSettings_().clubName + ' Fixtures')
@@ -60,6 +65,7 @@ function onOpen() {
 /** Run once from the editor (or the sheet menu) to create the Settings and Places tabs. */
 function setup() {
   getMatchesSheet_(); // throws a clear error if the match tab can't be found
+  ensureResultColumns_();
   ensureSettings_();
   ensurePlaces_();
 }
@@ -81,6 +87,7 @@ function verifyAdmin(pin) {
 function saveMatch(pin, match, rowNumber, fp) {
   assertAdmin_(pin);
   const m = validate_(match);
+  ensureResultColumns_();
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
@@ -283,6 +290,20 @@ function splitIntoSeparateColumns() {
   try { SpreadsheetApp.getUi().alert('Done – Location, Date and Time are now separate columns.'); } catch (e) {}
 }
 
+/** Adds "Result" and "Score" header columns to the match tab if they're missing. */
+function ensureResultColumns_() {
+  const sh = getMatchesSheet_();
+  const lastCol = sh.getLastColumn();
+  const map = headerMap_(sh.getRange(1, 1, 1, lastCol).getValues()[0]);
+  let col = lastCol;
+  [['result', 'Result'], ['score', 'Score']].forEach(([key, label]) => {
+    if (map[key] !== undefined) return;
+    sh.getRange(1, lastCol).copyFormatToRange(sh, col + 1, col + 1, 1, 1);
+    sh.getRange(1, col + 1).setValue(label);
+    col++;
+  });
+}
+
 /* ---------------- Places (for Google Maps links) ---------------- */
 
 function readPlaces_() {
@@ -318,12 +339,13 @@ function ensurePlaces_() {
 function validate_(match) {
   const src = match || {};
   const m = {};
-  ['ourTeam', 'opponent', 'venue', 'homeTeam', 'awayTeam', 'status', 'date', 'dateNote', 'time', 'place']
+  ['ourTeam', 'opponent', 'venue', 'homeTeam', 'awayTeam', 'status', 'result', 'score', 'date', 'dateNote', 'time', 'place']
     .forEach(k => { m[k] = String(src[k] || '').trim().slice(0, 200); });
   if (!m.ourTeam) throw new Error('Our Team is required.');
   if (!m.opponent) throw new Error('Opponent is required.');
   if (m.date && !/^\d{4}-\d{2}-\d{2}$/.test(m.date)) throw new Error('Date must be a valid date.');
   if (m.time && !normTime_(m.time)) throw new Error('Time must be HH:MM.');
+  if (m.result && ['Won', 'Lost', 'Draw'].indexOf(m.result) < 0) throw new Error('Result must be Won, Lost or Draw.');
   if (m.date) m.dateNote = '';
   m.time = m.time ? normTime_(m.time) : '';
   return m;
