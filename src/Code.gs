@@ -13,6 +13,9 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
+const APP_VERSION = '1.8.0';
+const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
+
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
 const SETTINGS_SHEET = 'Settings';
 const PLACES_SHEET = 'Places';
@@ -35,7 +38,8 @@ const FIELDS = [
 const TEXT_FIELDS = ['ourTeam', 'opponent', 'venue', 'homeTeam', 'awayTeam', 'status', 'result', 'score'];
 
 const DEFAULT_SETTINGS = [
-  ['Club Name', 'My Club', 'Shown at the top of the app'],
+  ['Club Name', 'ACBC', 'Short club name (browser tab)'],
+  ['App Title', 'ACBC Juvenile League 2026-27', 'Title at the top of the app'],
   ['Admin Passwords', '', 'One per admin, separated by commas (letters/numbers, e.g. Shuttle24, Smash99). Case-sensitive. Blank = editing disabled'],
   ['Viewer Code', '', 'Optional code managers enter once to view. Blank = anyone with the link'],
   ['Statuses', 'Not Scheduled, Scheduled, Confirmed, Postponed, Cancelled, Played', 'Options in the status dropdown']
@@ -52,7 +56,7 @@ function doGet() {
   ensureTeamSheets_();
   return HtmlService.createTemplateFromFile('Index')
     .evaluate()
-    .setTitle(getSettings_().clubName + ' Fixtures')
+    .setTitle(getSettings_().title)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -157,6 +161,8 @@ function payload_(s) {
   const teams = Array.from(new Set(matches.map(m => m.ourTeam).concat(readTeamInfo_().map(t => t.team)).filter(Boolean))).sort();
   return {
     clubName: s.clubName,
+    title: s.title,
+    version: APP_VERSION + (BUILD.indexOf('__') === 0 ? '' : ' · ' + BUILD),
     statuses: statuses,
     teams: teams,
     places: readPlaces_(),
@@ -632,8 +638,11 @@ function ensureSettings_() {
     const i = col.findIndex(r => String(r[0]).trim().toLowerCase() === 'admin pins');
     if (i >= 0) {
       sh.getRange(i + 1, 1).setValue('Admin Passwords');
-      sh.getRange(i + 1, 3).setValue(DEFAULT_SETTINGS[1][2]);
+      sh.getRange(i + 1, 3).setValue(DEFAULT_SETTINGS.find(r => r[0] === 'Admin Passwords')[2]);
     }
+    // add any settings rows that newer versions introduced (e.g. App Title)
+    const have = sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), 1).getDisplayValues().map(r => String(r[0]).trim().toLowerCase());
+    DEFAULT_SETTINGS.filter(r => have.indexOf(r[0].toLowerCase()) < 0).forEach(r => sh.appendRow(r));
   }
   if (!sh) {
     sh = ss.insertSheet(SETTINGS_SHEET);
@@ -651,10 +660,11 @@ function getSettings_() {
   rows.slice(1).forEach(r => { kv[String(r[0]).trim().toLowerCase()] = String(r[1]).trim(); });
   const list = s => (s || '').split(',').map(x => x.trim()).filter(Boolean);
   return {
-    clubName: kv['club name'] || 'My Club',
+    clubName: kv['club name'] || 'ACBC',
+    title: kv['app title'] || 'ACBC Juvenile League 2026-27',
     adminPins: list(kv['admin passwords'] || kv['admin pins']),
     viewerCode: kv['viewer code'] || '',
-    statuses: list(kv['statuses'] || DEFAULT_SETTINGS[3][1])
+    statuses: list(kv['statuses'] || DEFAULT_SETTINGS.find(r => r[0] === 'Statuses')[1])
   };
 }
 

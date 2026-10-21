@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 150" role="img" aria-label="ACBC">
+  <!-- left (red) and right (blue) arms forming the shuttle feathers -->
+  <path d="M4 30 Q16 16 36 12 Q46 44 61 82 L53 85 Q26 58 4 30 Z" fill="#e5483c" stroke="#f4f2f8" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M101 5 L114 12 L66 84 L59 82 Z" fill="#3d4fb3" stroke="#f4f2f8" stroke-width="3" stroke-linejoin="round"/>
+  <!-- head -->
+  <circle cx="58" cy="27" r="11" fill="#8b7fc2" stroke="#f4f2f8" stroke-width="3"/>
+  <!-- shuttle band and cork -->
+  <rect x="38" y="87" width="44" height="8" rx="3" fill="#f4f2f8"/>
+  <path d="M40 100 H80 A20 20 0 0 1 40 100 Z" fill="#1b2140" stroke="#f4f2f8" stroke-width="3" stroke-linejoin="round"/>
+  <!-- wordmark -->
+  <text x="60" y="144" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900"
+        font-size="27" letter-spacing="1" fill="#f4f2f8">ACBC</text>
+</svg>

@@ -124,6 +124,14 @@ Both functions are also in the sheet's **Fixtures App** menu.
 - If someone changed a row in the sheet after the app loaded, the save is blocked with
   "refresh and try again", so nobody overwrites anyone else's change.
 
+## Look, title and version
+
+- Colours follow the ACBC jersey (navy with mint triangles); the logo is a vector redraw in
+  `assets/acbc-logo.svg` (a 1024px PNG is alongside for printing or WhatsApp).
+- The title comes from **Settings → App Title** (default "ACBC Juvenile League 2026-27").
+- The footer shows the version, e.g. `v1.8.0 · 21 Oct 2026 · 65d2fe6`. The date and commit are stamped
+  automatically by each deploy; bump `APP_VERSION` in `src/Code.gs` for bigger releases.
+
 ## Good to know
 
 - **Changes made in the Apps Script editor get overwritten by the next deploy.** Make code changes here instead.

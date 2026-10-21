@@ -37,6 +37,12 @@ jobs:
           printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
           chmod 600 ~/.clasprc.json
 
+      - name: Stamp the build (date · commit) into the app footer
+        run: |
+          STAMP="$(TZ=Europe/Dublin date '+%-d %b %Y') · ${GITHUB_SHA::7}"
+          sed -i "s|'__BUILD__'|'${STAMP}'|" src/Code.gs
+          grep -n "const BUILD" src/Code.gs
+
       - name: Send the code to Apps Script
         run: |
           if ! grep -q '"scriptId": *"[A-Za-z0-9_-]\{20,\}"' .clasp.json; then
