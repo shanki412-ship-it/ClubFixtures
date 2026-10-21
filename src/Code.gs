@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -42,6 +42,7 @@ const DEFAULT_SETTINGS = [
   ['App Title', 'ACBC Juvenile League 2026-27', 'Title at the top of the app'],
   ['Admin Passwords', '', 'One per admin, separated by commas (letters/numbers, e.g. Shuttle24, Smash99). Case-sensitive. Blank = editing disabled'],
   ['Viewer Code', '', 'Optional code managers enter once to view. Blank = anyone with the link'],
+  ['Icon URL', '', 'Browser-tab icon: upload acbc-icon-512.png to Google Drive, share "Anyone with the link", paste the link here'],
   ['Home Location', 'Celbridge', 'Location used for home matches that have no location filled in'],
   ['Statuses', 'Not Scheduled, Scheduled, Confirmed, Postponed, Cancelled, Played', 'Options in the status dropdown']
 ];
@@ -76,11 +77,28 @@ function doGet() {
   ensurePlaces_();
   ensureResultColumns_();
   ensureTeamSheets_();
-  return HtmlService.createTemplateFromFile('Index')
+  const s = getSettings_();
+  const page = HtmlService.createTemplateFromFile('Index')
     .evaluate()
-    .setTitle(getSettings_().title)
+    .setTitle(s.title)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  const icon = iconHref_(s.iconUrl);
+  if (icon) { try { page.setFaviconUrl(icon); } catch (e) { console.warn('Icon URL not accepted: ' + e); } }
+  return page;
+}
+
+/**
+ * Turns a Google Drive share link into a direct image link the browser can use as the tab icon.
+ * Other https image links are used as they are. Apps Script only accepts icon links that end in
+ * an image extension, so a "#.png" ending is added when needed (browsers ignore it).
+ */
+function iconHref_(url) {
+  url = String(url || '').trim();
+  if (!/^https:\/\//i.test(url)) return '';
+  const id = (url.match(/\/d\/([A-Za-z0-9_-]{20,})/) || url.match(/[?&]id=([A-Za-z0-9_-]{20,})/) || [])[1];
+  if (/drive\.google\.com|docs\.google\.com/i.test(url) && id) url = 'https://lh3.googleusercontent.com/d/' + id;
+  return /\.(png|ico|gif|jpe?g)(\?|#|$)/i.test(url) ? url : url + '#.png';
 }
 
 function onOpen() {
@@ -734,6 +752,7 @@ function getSettings_() {
     clubName: kv['club name'] || 'ACBC',
     title: kv['app title'] || 'ACBC Juvenile League 2026-27',
     homeLocation: kv['home location'] || 'Celbridge',
+    iconUrl: kv['icon url'] || '',
     adminPins: list(kv['admin passwords'] || kv['admin pins']),
     viewerCode: kv['viewer code'] || '',
     statuses: list(kv['statuses'] || DEFAULT_SETTINGS.find(r => r[0] === 'Statuses')[1])

@@ -134,6 +134,8 @@ Both functions are also in the sheet's **Fixtures App** menu.
 
 - Colours follow the ACBC jersey (navy with mint triangles); the logo is a vector redraw in
   `assets/acbc-logo.svg` (a 1024px PNG is alongside for printing or WhatsApp).
+- **Browser-tab icon**: upload `assets/acbc-icon-512.png` to Google Drive, Share → *Anyone with the link*,
+  copy the link and paste it into **Settings → Icon URL**. The app converts Drive links automatically.
 - The title comes from **Settings → App Title** (default "ACBC Juvenile League 2026-27").
 - The footer shows the version, e.g. `v1.8.0 · 21 Oct 2026 · 65d2fe6`. The date and commit are stamped
   automatically by each deploy; bump `APP_VERSION` in `src/Code.gs` for bigger releases.
