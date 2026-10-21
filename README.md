@@ -42,8 +42,10 @@ searches "<place>, Ireland". Admins normally manage this from the app's **Locati
 The manager's name shows under the Team dropdown and in each match's details.
 
 **Divisions tab** (created automatically, pre-filled from the fixtures): `Division | Team | Team Manager |
-Manager Phone`, one row per team in each division (ours and opponents). An opponent's manager and phone show in
-the details of every match against that team, with tap-to-call. The match form's **Opponent** dropdown lists the teams in our team's division,
+Manager Phone`, one row per team in each division (ours and opponents). Every match shows a line with both managers
+(ours vs theirs); a name with a phone number is a **WhatsApp link** that opens a chat with a message about that
+match already started. Irish numbers like 087 123 4567 are converted to +353 automatically. Opponent contacts are
+per division, so "Kerela 1" in U15 and "Kerela 1" in U17 can have different managers. The match form's **Opponent** dropdown lists the teams in our team's division,
 with an *Other…* option; a new opponent typed there is added to the division automatically.
 
 Admins normally manage both from the app: **Admin → Teams & managers**.
