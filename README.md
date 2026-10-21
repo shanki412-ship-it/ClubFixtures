@@ -87,9 +87,11 @@ Both functions are also in the sheet's **Fixtures App** menu.
 
 ## How it works
 
-- **Managers**: Upcoming / Results / All / Stats tabs, a **Team ▼** dropdown (grouped U13–U19, remembered on their phone), search,
+- **Managers**: **Fixtures** and **Stats** tabs, a **Team ▼** dropdown (grouped U13–U19, remembered on their phone), search,
   tap a location to open Google Maps.
-- **List or Calendar** on every fixtures tab. Colour = venue (blue Home, orange Away);
+- **Fixtures** is one season list: *Results & earlier* (with a W/L summary), then *Upcoming*, then *No date yet*.
+  For All teams, results fold into one line so you land on what's next; picking a team shows its whole season.
+- **List or Calendar** on the Fixtures tab. Colour = venue (blue Home, orange Away);
   solid = confirmed (Scheduled/Confirmed/Played with a date), dashed = TBC / not scheduled.
   Tap a calendar day to see its matches; undated fixtures are listed under the calendar.
 - **Stats**: played / won / lost / drawn / win rate, wins-vs-losses bar, home vs away record,
@@ -102,7 +104,7 @@ Both functions are also in the sheet's **Fixtures App** menu.
   Choosing Home/Away auto-fills Home Team / Away Team, and Home pre-fills your usual home location.
   Use the date picker, or pick TBC / Internal when there's no date yet.
   Enter the Result and Score after a match; picking a result sets Status to Played.
-  A match with a result moves to the Results tab and counts in Stats.
+  A match with a result moves into *Results & earlier* and counts in Stats.
 - **Locations tab (admins only)**: every location with its address and how many matches use it.
   **+ Add location** to create one; tap one to set its address or rename it (renaming can also fix the
   name in every match, e.g. Knocklyn → Knocklyon). Places used in fixtures but missing from the list

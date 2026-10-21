@@ -49,6 +49,8 @@
   .sw-home{background:var(--home)} .sw-away{background:var(--away)}
   .sw-tbc{border:1.5px dashed var(--muted);background:transparent}
   main{padding:4px 12px 90px;max-width:760px;margin:0 auto}
+  .sect{display:block;width:100%;text-align:left;border:0;background:none;padding:0;font:inherit;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:12px 2px 5px}
+  .sect.toggle{cursor:pointer;color:var(--brand)}
   .day{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:10px 2px 4px}
   .empty,.msg{text-align:center;color:var(--muted);padding:32px 16px}
 
@@ -168,9 +170,7 @@
     <button class="icon-btn" id="adminBtn" title="Admin login" style="display:none">🔒</button>
   </div>
   <div class="tabs" id="tabs">
-    <button class="tab on" data-view="upcoming">Upcoming</button>
-    <button class="tab" data-view="past">Results</button>
-    <button class="tab" data-view="all">All</button>
+    <button class="tab on" data-view="fixtures">Fixtures</button>
     <button class="tab" data-view="stats">Stats</button>
     <button class="tab admin-only" data-view="places">Locations</button>
   </div>
@@ -277,7 +277,7 @@
 <script>
 const FIELDS = ['ourTeam','opponent','venue','homeTeam','awayTeam','status','result','score','date','dateNote','time','place'];
 const NO_MAP = ['', 'tbc', 'internal'];
-const state = { data:null, view:'upcoming', mode:'list', team:'', q:'', pin:'', editing:null, editPlace:null, calMonth:null, calDay:null, open:{} };
+const state = { data:null, view:'fixtures', mode:'list', showPast:null, team:'', q:'', pin:'', editing:null, editPlace:null, calMonth:null, calDay:null, open:{} };
 const $ = id => document.getElementById(id);
 
 const store = {
@@ -373,14 +373,9 @@ function showGate(club){
 function teamFiltered(){ return state.data.matches.filter(m => !state.team || m.ourTeam === state.team); }
 function viewRows(){
   const today = todayISO(), q = state.q.toLowerCase();
-  return teamFiltered().filter(m => {
-    if(q && !FIELDS.some(f => String(m[f]||'').toLowerCase().includes(q))) return false;
-    const done = !!res(m) || (isISO(m.date) && m.date < today);
-    if(state.view==='upcoming') return !done;
-    if(state.view==='past') return done;
-    return true;
-  });
+  return teamFiltered().filter(m => !q || FIELDS.some(f => String(m[f]||'').toLowerCase().includes(q)));
 }
+function isDone(m){ return !!res(m) || (isISO(m.date) && m.date < todayISO()); }
 const sortKey = m => (isISO(m.date) ? m.date : '9999-99-99 ' + (m.dateNote||'zzz').toLowerCase()) + ' ' + (m.time || '99:99') + ' ' + m.ourTeam;
 const byKey = (a,b) => sortKey(a) < sortKey(b) ? -1 : sortKey(a) > sortKey(b) ? 1 : 0;
 
@@ -398,9 +393,9 @@ function renderChips(){
   $('teamSel').value = state.team;
   $('teamWrap').classList.toggle('on', !!state.team);
 }
-$('teamSel').onchange = e => { state.team = e.target.value; store.set('myTeam', state.team); state.calMonth = null; state.calDay = null; renderChips(); render(); };
+$('teamSel').onchange = e => { state.team = e.target.value; state.showPast = null; store.set('myTeam', state.team); state.calMonth = null; state.calDay = null; renderChips(); render(); };
 function render(){
-  const v = state.view, fixtures = ['upcoming','past','all'].includes(v);
+  const v = state.view, fixtures = v === 'fixtures';
   $('listControls').style.display = fixtures ? '' : 'none';
   $('legend').style.display = fixtures ? '' : 'none';
   $('teamWrap').style.display = v === 'places' ? 'none' : '';
@@ -454,15 +449,31 @@ function wireRows(root){
   });
 }
 function emptyMsg(){
-  return '<div class="empty">No '+(state.view==='past'?'results':'matches')+' to show'+(state.team?' for '+esc(state.team):'')+'.</div>';
+  return '<div class="empty">No matches to show'+(state.team?' for '+esc(state.team):'')+(state.q?' matching “'+esc(state.q)+'”':'')+'.</div>';
 }
 
 // ---- list view ----
+// One season list: results (oldest first) → upcoming → no date yet.
+// Results fold away for "All teams" so you land on what's next; a single team shows its whole season.
 function renderList(){
-  let rows = viewRows().sort(byKey);
-  if(state.view==='past') rows.reverse();
-  $('list').innerHTML = rows.length ? '<div style="height:6px"></div>' + rows.map(rowHTML).join('') : emptyMsg();
+  const rows = viewRows().sort(byKey);
+  if(!rows.length){ $('list').innerHTML = emptyMsg(); return; }
+  const past = rows.filter(m => isDone(m) && (isISO(m.date) || res(m)));
+  const next = rows.filter(m => !isDone(m) && isISO(m.date));
+  const undated = rows.filter(m => !isISO(m.date) && !res(m));
+  const show = state.showPast !== null ? state.showPast : !!(state.team || state.q);
+  const t = tally(past);
+  let html = '';
+  if(past.length){
+    const summary = t.P ? ' · '+t.W+'W '+t.L+'L'+(t.D?' '+t.D+'D':'') : '';
+    html += '<button class="sect toggle" id="pastToggle">'+(show?'▾':'▸')+' Results &amp; earlier · '+past.length+summary+'</button>';
+    if(show) html += past.map(rowHTML).join('');
+  }
+  html += '<div class="sect">Upcoming · '+next.length+'</div>' + (next.length ? next.map(rowHTML).join('') : '<div class="empty" style="padding:10px">No upcoming dated matches.</div>');
+  if(undated.length) html += '<div class="sect">No date yet · '+undated.length+'</div>' + undated.map(rowHTML).join('');
+  $('list').innerHTML = html;
   wireRows($('list'));
+  if($('pastToggle')) $('pastToggle').onclick = () => { state.showPast = !show; renderList(); };
 }
 
 // ---- calendar view ----
@@ -471,7 +482,6 @@ function defaultMonth(rows){
   const now = todayISO().slice(0,7);
   if(!dated.length) return now;
   if(dated.some(d => d.slice(0,7) === now)) return now;
-  if(state.view === 'past') return dated[dated.length-1].slice(0,7);
   const next = dated.find(d => d.slice(0,7) >= now);
   return (next || dated[0]).slice(0,7);
 }
@@ -511,7 +521,7 @@ function renderCalendar(){
     '<div class="grid7">'+g+'</div></div>';
   html += '<div class="day">'+(state.calDay ? esc(dayLabel(state.calDay))+' · <a href="#" id="calAll" style="color:var(--brand)">whole month</a>' : esc(title))+'</div>';
   html += below.length ? below.map(rowHTML).join('') : '<div class="empty" style="padding:12px">No matches.</div>';
-  if(undated.length && state.view !== 'past'){
+  if(undated.length){
     html += '<div class="day">No date yet ('+undated.length+')</div>' + undated.map(rowHTML).join('');
   }
   $('list').innerHTML = html;
@@ -590,7 +600,7 @@ function placeUsage(){
   return c;
 }
 function renderPlaces(){
-  if(!state.pin){ state.view = 'upcoming'; setTab(); return render(); }
+  if(!state.pin){ state.view = 'fixtures'; setTab(); return render(); }
   const use = placeUsage();
   const list = (state.data.placeList || []).slice().sort((a,b) => a.name.localeCompare(b.name));
   const known = new Set(list.map(p => p.name.toLowerCase()));
@@ -673,7 +683,7 @@ function setAdmin(pin, remember){
   $('adminBtn').textContent = pin ? 'Admin ✓' : '🔒';
   $('adminBtn').title = pin ? 'Sign out of admin' : 'Admin login';
   $('fab').classList.toggle('show', !!pin);
-  if(!pin && state.view === 'places'){ state.view = 'upcoming'; setTab(); }
+  if(!pin && state.view === 'places'){ state.view = 'fixtures'; setTab(); }
   if(state.data){ updateSub(); render(); }
 }
 $('adminBtn').onclick = () => {
