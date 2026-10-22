@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.17.0';
+const APP_VERSION = '1.18.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -44,6 +44,7 @@ const DEFAULT_SETTINGS = [
   ['Viewer Code', '', 'Optional code managers enter once to view. Blank = anyone with the link'],
   ['Icon URL', '', 'Browser-tab icon: upload acbc-icon-512.png to Google Drive, share "Anyone with the link", paste the link here'],
   ['Home Location', 'Celbridge', 'Location used for home matches that have no location filled in'],
+  ['Weekly Email To', '', 'Who gets the Monday fixtures email: email addresses separated by commas'],
   ['Statuses', 'Not Scheduled, Scheduled, Confirmed, Postponed, Cancelled, Played', 'Options in the status dropdown']
 ];
 
@@ -106,6 +107,10 @@ function onOpen() {
     .createMenu('Fixtures App')
     .addItem('Set up Settings, Places, Teams & Divisions tabs', 'setup')
     .addItem('Split time into Time + Location columns', 'splitIntoSeparateColumns')
+    .addSeparator()
+    .addItem('Weekly email: send a test now (next week)', 'sendWeeklyEmailTest')
+    .addItem('Weekly email: turn ON (Mondays ~7am)', 'turnOnWeeklyEmail')
+    .addItem('Weekly email: turn OFF', 'turnOffWeeklyEmail')
     .addToUi();
 }
 
@@ -116,6 +121,121 @@ function setup() {
   ensureSettings_();
   ensurePlaces_();
   ensureTeamSheets_();
+}
+
+/* ---------------- Monday email ---------------- */
+
+/** Trigger target: runs every Monday morning and emails this week's (Mon–Sun) matches. */
+function sendWeeklyEmail() {
+  const s = getSettings_();
+  if (!s.weeklyEmailTo.length) { console.warn('Weekly email: no addresses in Settings → Weekly Email To'); return; }
+  const mail = buildWeeklyEmail_(mondayOf_(new Date()));
+  MailApp.sendEmail({ to: s.weeklyEmailTo.join(','), subject: mail.subject, htmlBody: mail.html, body: mail.text, name: s.title });
+}
+
+/** Menu: send next week's email now (to the Settings list, or to you if it's empty). */
+function sendWeeklyEmailTest() {
+  const s = getSettings_();
+  if (!s.weeklyEmailTo.length) {
+    try { SpreadsheetApp.getUi().alert('Add at least one email address in Settings → Weekly Email To, then try again.'); } catch (e) {}
+    return;
+  }
+  const to = s.weeklyEmailTo.join(',');
+  const next = mondayOf_(new Date()); next.setDate(next.getDate() + 7);
+  const mail = buildWeeklyEmail_(next);
+  MailApp.sendEmail({ to: to, subject: '[TEST] ' + mail.subject, htmlBody: mail.html, body: mail.text, name: s.title });
+  try { SpreadsheetApp.getUi().alert('Test email sent to ' + to); } catch (e) {}
+}
+
+function turnOnWeeklyEmail() {
+  turnOffWeeklyEmail(true);
+  ScriptApp.newTrigger('sendWeeklyEmail').timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(7).inTimezone('Europe/Dublin').create();
+  const to = getSettings_().weeklyEmailTo;
+  try { SpreadsheetApp.getUi().alert('Monday email is ON (around 7–8am).' + (to.length ? '\nGoes to: ' + to.join(', ') : '\n⚠ Add addresses in Settings → Weekly Email To.')); } catch (e) {}
+}
+
+function turnOffWeeklyEmail(quiet) {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'sendWeeklyEmail').forEach(t => ScriptApp.deleteTrigger(t));
+  if (quiet !== true) { try { SpreadsheetApp.getUi().alert('Monday email is OFF.'); } catch (e) {} }
+}
+
+function mondayOf_(d) { const m = new Date(d.getFullYear(), d.getMonth(), d.getDate()); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m; }
+
+/** Builds the email for the week starting on `monday` (Mon–Sun). Returns {subject, html, text, count}. */
+function buildWeeklyEmail_(monday) {
+  const s = getSettings_(), tz = Session.getScriptTimeZone();
+  const iso = d => Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+  const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6);
+  const from = iso(monday), to = iso(sunday);
+  const fmt = (d, p) => Utilities.formatDate(d, tz, p);
+  const range = fmt(monday, 'd MMM') + ' – ' + fmt(sunday, 'd MMM yyyy');
+  const appUrl = (() => { try { return ScriptApp.getService().getUrl() || ''; } catch (e) { return ''; } })();
+
+  const places = {}; readPlaceList_().forEach(p => places[p.name.toLowerCase()] = p);
+  const teams = {}; readTeamInfo_().forEach(t => teams[t.team.toLowerCase()] = t);
+  const opps = readOpponentInfo_();
+  const all = readMatches_();
+  const week = all.filter(m => m.date && m.date >= from && m.date <= to && !m.result)
+    .sort((a, b) => (a.date + (a.time || '99:99') + a.ourTeam).localeCompare(b.date + (b.time || '99:99') + b.ourTeam));
+  const nextAfter = all.filter(m => m.date && m.date > to && !m.result).sort((a, b) => a.date.localeCompare(b.date))[0];
+
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const wa = (phone, name, m) => {
+    let d = String(phone || '').replace(/[^0-9+]/g, '');
+    if (d[0] === '+') d = d.slice(1); else if (d.slice(0, 2) === '00') d = d.slice(2); else if (d[0] === '0') d = '353' + d.slice(1);
+    if (d.length < 8) return esc(name || '');
+    const txt = 'Hi ' + (name || '') + ', about ' + m.ourTeam + ' v ' + m.opponent + ' – ';
+    return '<a href="https://wa.me/' + d + '?text=' + encodeURIComponent(txt) + '" style="color:#128c4a;font-weight:bold;text-decoration:none">' + esc(name || phone) + '</a>';
+  };
+  const mapLink = m => {
+    const p = places[(m.place || '').toLowerCase()];
+    if (!m.place || /^(tbc|internal)$/i.test(m.place)) return esc(m.place || 'Location TBC');
+    const href = p && (p.link || (p.address ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(p.address) : ''));
+    return href ? '<a href="' + esc(href) + '" style="color:#0f7a5c">' + esc(m.place) + '</a>' : esc(m.place) + ' <span style="color:#8a8f98">(address TBC)</span>';
+  };
+  const confirmed = m => /^(sched|conf|play)/i.test(m.status || '');
+
+  let rows = '', text = s.title + '\nFixtures ' + range + '\n\n', lastDay = '';
+  week.forEach(m => {
+    const day = fmt(new Date(m.date + 'T12:00:00'), 'EEEE d MMMM');
+    if (day !== lastDay) {
+      rows += '<tr><td colspan="3" style="padding:16px 0 6px;font:bold 13px Arial,sans-serif;color:#5b6478;text-transform:uppercase;letter-spacing:.5px">' + esc(day) + '</td></tr>';
+      text += day + '\n'; lastDay = day;
+    }
+    const home = /^home/i.test(m.venue), colour = home ? '#2563eb' : '#ea580c';
+    const t = teams[m.ourTeam.toLowerCase()] || {}, o = opps.find(x => x.team.toLowerCase() === m.opponent.toLowerCase() && x.division === t.division) || {};
+    const mgrs = [t.manager ? '👤 ' + wa(t.phone, t.manager, m) : '', o.manager ? 'vs ' + wa(o.phone, o.manager, m) : ''].filter(Boolean).join(' &nbsp; ');
+    rows += '<tr><td style="padding:8px 10px;border-left:4px ' + (confirmed(m) ? 'solid' : 'dashed') + ' ' + colour + ';background:#fff;vertical-align:top;width:56px;font:bold 15px Arial,sans-serif;color:#151a30">' + esc(m.time || 'TBC') + '</td>' +
+      '<td style="padding:8px 6px;background:#fff;vertical-align:top;font:14px Arial,sans-serif;color:#151a30">' +
+        '<span style="display:inline-block;background:' + colour + ';color:#fff;font:bold 10px Arial,sans-serif;padding:1px 5px;border-radius:3px;margin-right:6px">' + (home ? 'HOME' : 'AWAY') + '</span>' +
+        '<b>' + esc(m.ourTeam) + '</b> v <b>' + esc(m.opponent) + '</b><br>' +
+        '<span style="font-size:13px;color:#5b6478">📍 ' + mapLink(m) + (mgrs ? '<br>' + mgrs : '') + '</span></td>' +
+      '<td style="padding:8px 10px;background:#fff;vertical-align:top;text-align:right;font:bold 11px Arial,sans-serif;color:' + (confirmed(m) ? '#0b7a4b' : '#8a8f98') + ';white-space:nowrap">' + esc(m.status || '') + '</td></tr>' +
+      '<tr><td colspan="3" style="height:4px;font-size:0;line-height:0">&nbsp;</td></tr>';
+    text += '  ' + (m.time || 'TBC') + '  ' + (home ? 'HOME' : 'AWAY') + '  ' + m.ourTeam + ' v ' + m.opponent + '  @ ' + (m.place || 'TBC') + '  [' + (m.status || '') + ']' +
+      (t.manager ? '  Manager: ' + t.manager + (t.phone ? ' ' + t.phone : '') : '') + '\n';
+  });
+  if (!week.length) {
+    rows = '<tr><td style="padding:18px;background:#fff;font:14px Arial,sans-serif;color:#151a30">No matches this week.' +
+      (nextAfter ? ' Next match: <b>' + esc(fmt(new Date(nextAfter.date + 'T12:00:00'), 'EEE d MMM')) + '</b> – ' + esc(nextAfter.ourTeam) + ' v ' + esc(nextAfter.opponent) + '.' : '') + '</td></tr>';
+    text += 'No matches this week.\n';
+  }
+  const unconfirmed = week.filter(m => !confirmed(m)).length;
+  const html =
+    '<div style="background:#eef3f2;padding:16px 8px"><table role="presentation" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;margin:0 auto;border-collapse:collapse">' +
+    '<tr><td colspan="3" style="background:#1b2140;border-bottom:3px solid #7fd8b6;padding:16px 18px;border-radius:10px 10px 0 0">' +
+      (s.iconUrl ? '<img src="' + esc(iconHref_(s.iconUrl).replace('#.png', '')) + '" width="40" height="40" alt="" style="vertical-align:middle;border-radius:8px;margin-right:10px">' : '') +
+      '<span style="font:bold 18px Arial,sans-serif;color:#fff;vertical-align:middle">' + esc(s.title) + '</span><br>' +
+      '<span style="font:14px Arial,sans-serif;color:#7fd8b6">Fixtures this week · ' + esc(range) + '</span></td></tr>' +
+    '<tr><td colspan="3" style="padding:10px 4px 0;font:13px Arial,sans-serif;color:#5b6478">' +
+      (week.length ? '<b style="color:#151a30">' + week.length + ' match' + (week.length === 1 ? '' : 'es') + '</b>' + (unconfirmed ? ' · ' + unconfirmed + ' not confirmed yet (dashed)' : ' · all confirmed') : '') +
+      '</td></tr>' + rows +
+    '<tr><td colspan="3" style="padding:16px 4px;font:12px Arial,sans-serif;color:#5b6478;text-align:center">' +
+      (appUrl ? '<a href="' + esc(appUrl) + '" style="display:inline-block;background:#7fd8b6;color:#1b2140;font:bold 14px Arial,sans-serif;padding:10px 18px;border-radius:8px;text-decoration:none">Open the fixtures app</a><br><br>' : '') +
+      'Blue = home · Orange = away · Dashed = not confirmed yet<br>Sent every Monday by the ' + esc(s.clubName) + ' fixtures app · v' + esc(appVersion_()) + '</td></tr>' +
+    '</table></div>';
+  return { subject: s.clubName + ' fixtures ' + range + ' (' + (week.length ? week.length + ' match' + (week.length === 1 ? '' : 'es') : 'no matches') + ')',
+           html: html, text: text + (appUrl ? '\nApp: ' + appUrl + '\n' : ''), count: week.length };
 }
 
 /* ---------------- Public (client-callable) ---------------- */
@@ -847,6 +967,7 @@ function getSettings_() {
     title: kv['app title'] || 'ACBC Juvenile League 2026-27',
     homeLocation: kv['home location'] || 'Celbridge',
     iconUrl: kv['icon url'] || '',
+    weeklyEmailTo: list(kv['weekly email to']).filter(e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)),
     adminPins: list(kv['admin passwords'] || kv['admin pins']),
     viewerCode: kv['viewer code'] || '',
     statuses: list(kv['statuses'] || DEFAULT_SETTINGS.find(r => r[0] === 'Statuses')[1])

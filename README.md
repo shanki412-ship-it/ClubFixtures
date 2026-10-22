@@ -146,6 +146,21 @@ teams with fixtures show their match count instead, and the server refuses the r
 - The footer shows the version, e.g. `v1.8.0 · 21 Oct 2026 · 65d2fe6`. The date and commit are stamped
   automatically by each deploy; bump `APP_VERSION` in `src/Code.gs` for bigger releases.
 
+## Monday fixtures email
+
+Every Monday around 7–8am (Dublin time) the app emails that week's matches (Monday–Sunday): grouped by day,
+home/away colours, solid = confirmed / dashed = not yet, location with a Maps link (or "address TBC"), our
+manager and the opponent's manager (WhatsApp links where phones are saved), and an **Open the fixtures app**
+button. A week with no matches says so and names the next match.
+
+Setup (owner of the sheet, once):
+1. **Settings → Weekly Email To**: email addresses, comma-separated.
+2. Sheet menu **Fixtures App → Weekly email: send a test now (next week)**. Google asks for permission
+   (send email, run on a schedule) the first time; approve it. The web app needs this approval too.
+3. **Fixtures App → Weekly email: turn ON (Mondays ~7am)**. **Turn OFF** stops it.
+
+Emails are sent from the sheet owner's Gmail (Apps Script limit: 100 recipients a day on a free account).
+
 ## Staying up to date
 
 The page checks for changes every 30 minutes and whenever it comes back to the foreground (e.g. reopened from
