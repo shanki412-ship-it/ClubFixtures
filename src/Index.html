@@ -639,19 +639,16 @@ function rowHTML(m){
   else if(isCancelled(m)) right = '<span class="st '+statusClass(m.status)+'">'+esc(m.status)+'</span>';
   else if(conf) right = '<span class="st ok" title="'+esc(m.status)+'">✓</span>';
 
+  // Details only add what the row doesn't already show: full team name (when the row shows a short tag),
+  // status, the venue's address with a Maps link, and the admin Edit button.
+  const pl = (state.data.placeList || []).find(x => x.name.toLowerCase() === pk);
   let loc = '';
-  if(NO_MAP.indexOf(pk) < 0){
-    loc = '<a target="_blank" href="'+esc(mapsHref(m.place))+'">📍 '+esc(m.place)+' – open in Maps</a>';
-  } else loc = '📍 ' + (pk === 'internal' ? 'Internal' : 'Location TBC');
-  const fixture = (m.homeTeam && m.awayTeam) ? esc(m.homeTeam)+' v '+esc(m.awayTeam) : esc(m.ourTeam)+' v '+esc(m.opponent);
+  if(NO_MAP.indexOf(pk) < 0 && m.place){
+    loc = '<a target="_blank" href="'+esc(mapsHref(m.place))+'">📍 '+esc(pl && pl.address ? pl.address : m.place)+' – open in Maps</a>';
+  }
   const details =
-    '<div><b>'+fixture+'</b></div>'+
-    '<div>'+(isISO(m.date) ? dayLabel(m.date) : esc(m.dateNote||'Date TBC'))+(m.time?' · '+esc(m.time):'')+
-      ' · '+(s==='home'?'Home':s==='away'?'Away':esc(m.venue||'—'))+' · '+esc(m.status||'—')+'</div>'+
-    (r ? '<div>Result: <b>'+({W:'Won',L:'Lost',D:'Draw'})[r]+(m.score?' '+esc(m.score):'')+'</b></div>' : '')+
-    contactLine('Our manager', managerOf(m.ourTeam), (teamInfo(m.ourTeam)||{}).phone, m)+
-    (o => o ? contactLine(esc(m.opponent)+' manager', o.manager, o.phone, m) : '')(oppContact(m.ourTeam, m.opponent))+
-    '<div>'+loc+'</div>'+
+    '<div>'+(state.team ? '' : '<b>'+esc(m.ourTeam)+'</b> · ')+'Status: '+esc(m.status||'—')+'</div>'+
+    (loc ? '<div>'+loc+'</div>' : '')+
     (state.pin ? '<button class="editbtn" data-edit="'+m.row+'">Edit match</button>' : '');
 
   return '<div class="m '+s+(conf?'':' tbc')+(isCancelled(m)?' cancel':'')+(state.open[m.row]?' open':'')+'" data-row="'+m.row+'">'+
