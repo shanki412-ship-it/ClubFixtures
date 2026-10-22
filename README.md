@@ -33,7 +33,7 @@ It's safe to run again. Until you run it, the app still reads the old format cor
 
 **Places tab** (created automatically, pre-filled with every location found): `Place | Address or Eircode |
 Google Maps link | Type (Home/Away)`. Home venues are offered in the match form's Location dropdown for home
-matches, away venues for away matches. With a link, 📍 opens that exact pin; otherwise it searches the address.
+matches, away venues for away matches. With a link, 📍 opens that exact pin; otherwise it searches the saved address; with neither, "address TBC" and no link.
 Celbridge is pre-set to Scoil na Mainistreach, Oldtown Rd, Celbridge, with its map pin.
 **Home matches with no location use Settings → Home Location (Celbridge).** Without one, the link
 searches "<place>, Ireland". Admins normally manage this from the app's **Locations** tab instead.

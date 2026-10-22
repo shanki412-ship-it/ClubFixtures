@@ -483,8 +483,8 @@ function managersLine(m){
 function mapsHref(place){
   const p = (state.data.placeList || []).find(x => x.name.toLowerCase() === (place||'').toLowerCase());
   if(p && p.link) return p.link;
-  const q = (p && p.address) || state.data.places[(place||'').toLowerCase()] || (place + ', Ireland');
-  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
+  const q = (p && p.address) || state.data.places[(place||'').toLowerCase()] || '';
+  return q ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q) : '';   // no guessing from the name
 }
 
 // ---- load ----
@@ -644,7 +644,9 @@ function rowHTML(m){
   const pl = (state.data.placeList || []).find(x => x.name.toLowerCase() === pk);
   let loc = '';
   if(NO_MAP.indexOf(pk) < 0 && m.place){
-    loc = '<a target="_blank" href="'+esc(mapsHref(m.place))+'">📍 '+esc(pl && pl.address ? pl.address : m.place)+' – open in Maps</a>';
+    const href = mapsHref(m.place);
+    loc = href ? '<a target="_blank" href="'+esc(href)+'">📍 '+esc(pl && pl.address ? pl.address : m.place)+' – open in Maps</a>'
+               : '📍 '+esc(m.place)+' · address TBC';
   }
   const details =
     '<div>'+(state.team ? '' : '<b>'+esc(m.ourTeam)+'</b> · ')+'Status: '+esc(m.status||'—')+'</div>'+
