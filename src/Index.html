@@ -1275,9 +1275,10 @@ function wireAdminSeg(){
 }
 // fixtures in a division that involve a team (same rule as the server's removal check)
 function fixturesIn(division, team){
-  const k = (team||'').toLowerCase();
-  return state.data.matches.filter(m => divisionOf(m.ourTeam) === division &&
-    ((m.opponent||'').toLowerCase() === k || (m.ourTeam||'').toLowerCase() === k)).length;
+  const k = normTeam(oppBase(team)), ourT = isOurName(team) ? findOurTeamIn(team, division) : null;
+  return state.data.matches.filter(m => normTeam(divisionOf(m.ourTeam)) === normTeam(division) &&
+    (ourT ? findOurTeamIn(m.opponent, division) === ourT || findOurTeam(m.ourTeam) === ourT
+          : normTeam(oppBase(m.opponent)) === k)).length;
 }
 function renderTeamsAdmin(){
   if(!state.pin){ state.view = 'fixtures'; setTab(); return render(); }
@@ -1290,7 +1291,16 @@ function renderTeamsAdmin(){
     'The number on a team shows its fixtures; teams with fixtures can’t be removed.</div>';
   names.forEach(d => {
     const ourHere = info.filter(t => t.division === d);
-    const others = (divs[d] || []).filter(t => !ours.has(t.toLowerCase()) && !ourHere.some(o => o.team.toLowerCase() === t.toLowerCase()));
+    // opponents only: skip our own teams however they're written ("ACBC - A1 - U13 Boys Div 5"),
+    // and show each team once (duplicate rows and "ACE" / "ACE - U13 Boys Div 5" collapse; the Tidy tool fixes the sheet)
+    const seenOpp = new Set(), others = [];
+    (divs[d] || []).forEach(t => {
+      if(ours.has(t.toLowerCase()) || ourHere.some(o => o.team.toLowerCase() === t.toLowerCase())) return;
+      if(isOurName(t) || findOurTeamIn(t, d)) return;
+      const k = normTeam(oppBase(t)); if(seenOpp.has(k)) return;
+      seenOpp.add(k); others.push(t);
+    });
+    const messy = (divs[d] || []).length - ourHere.length - others.length > 0 || others.some(t => /\s+-\s+/.test(t));
     html += '<div class="div"><h3>'+esc(d)+'</h3>' +
       ourHere.map(t => '<div class="ours" data-team="'+esc(t.team)+'"><span class="nm">'+esc(t.team)+'</span>'+
         '<span class="mg'+(t.manager?'':' missing')+'">'+(t.manager ? '👤 '+esc(t.manager)+(t.phone ? (phoneProblem(t.phone) ? ' · <b style="color:var(--s-warn)">⚠ check phone</b>' : ' · 📞') : '') : 'Add manager')+
@@ -1298,12 +1308,13 @@ function renderTeamsAdmin(){
       '<div class="opps">' + others.map(o => {
         const c = (state.data.oppInfo||[]).find(x => x.division === d && x.team.toLowerCase() === o.toLowerCase());
         const used = fixturesIn(d, o);
-        return '<span class="opp-chip"><button class="on" title="Manager & phone" data-odiv="'+esc(d)+'" data-oteam="'+esc(o)+'">'+esc(o)+
+        return '<span class="opp-chip"><button class="on" title="Manager & phone" data-odiv="'+esc(d)+'" data-oteam="'+esc(o)+'">'+esc(oppBase(o))+
           (c ? ' <span class="ph">👤'+(c.phone ? (phoneProblem(c.phone) ? '<b style="color:var(--s-warn)">⚠</b>' : '📞') : '')+'</span>' : '')+'</button>'+
           (used ? '<span class="used" title="'+used+' fixture'+(used===1?'':'s')+' – can’t be removed">'+used+'</span>'
                 : '<button title="Remove from division" data-div="'+esc(d)+'" data-rm="'+esc(o)+'">✕</button>')+'</span>';
       }).join('') +
-      '<button class="opp-add" data-add="'+esc(d)+'">+ Add team</button></div></div>';
+      '<button class="opp-add" data-add="'+esc(d)+'">+ Add team</button></div>'+
+      (messy ? '<div class="hint" style="margin:6px 0 0;color:var(--s-warn)">⚠ This division has duplicate or non-standard names in the sheet – run <b>Fixtures App → Tidy team names</b>.</div>' : '')+'</div>';
   });
   if(noDiv.length){
     html += '<div class="div"><h3>Not in a division yet</h3>' + noDiv.map(t =>
