@@ -469,6 +469,7 @@
   <div class="sheet">
     <h2 id="oppTitle">Opponent</h2>
     <div class="hint" id="oppDiv" style="margin-top:-6px"></div>
+    <div class="hint" style="margin:0 0 8px">Irish numbers as usual (087…); other countries with + and the code, e.g. +91 98765 43210.</div>
     <div class="fgrid">
       <div><label>Their team manager</label><input id="o_mgr" placeholder="Manager's name" autocomplete="off"></div>
       <div><label>Manager phone</label><input id="o_phone" type="tel" inputmode="tel" placeholder="e.g. 087 123 4567" autocomplete="off"></div>
@@ -555,7 +556,16 @@ function oppContact(ourTeam, opponent){
   return looseFind(inDiv, opponent, 'team');
 }
 // WhatsApp: Irish numbers like "087 123 4567" become 353871234567; "+353…"/"00353…" are kept as international
+// Same rule as the server: Irish 0… numbers or + country code; anything else is flagged
+function phoneProblem(p){
+  p = String(p || '').trim(); if(!p) return '';
+  if(!/^[0-9+()\-\s]{6,25}$/.test(p)) return 'Phone number can only contain digits, spaces, + ( ) -';
+  const d = p.replace(/[^0-9+]/g, '');
+  if(/^(\+|00)\d{8,15}$/.test(d) || /^0\d{8,9}$/.test(d)) return '';
+  return 'Add the country code, e.g. +91 98765 43210 (Irish numbers can start with 0).';
+}
 function waNumber(phone){
+  if(phoneProblem(phone)) return '';                 // never guess a country
   let d = String(phone||'').trim().replace(/[^0-9+]/g,'');
   if(d.startsWith('+')) d = d.slice(1); else if(d.startsWith('00')) d = d.slice(2); else if(d.startsWith('0')) d = '353' + d.slice(1);
   return d.length >= 8 ? d : '';
@@ -1184,13 +1194,13 @@ function renderTeamsAdmin(){
     const others = (divs[d] || []).filter(t => !ours.has(t.toLowerCase()) && !ourHere.some(o => o.team.toLowerCase() === t.toLowerCase()));
     html += '<div class="div"><h3>'+esc(d)+'</h3>' +
       ourHere.map(t => '<div class="ours" data-team="'+esc(t.team)+'"><span class="nm">'+esc(t.team)+'</span>'+
-        '<span class="mg'+(t.manager?'':' missing')+'">'+(t.manager ? '👤 '+esc(t.manager)+(t.phone ? ' · 📞' : '') : 'Add manager')+
+        '<span class="mg'+(t.manager?'':' missing')+'">'+(t.manager ? '👤 '+esc(t.manager)+(t.phone ? (phoneProblem(t.phone) ? ' · <b style="color:var(--s-warn)">⚠ check phone</b>' : ' · 📞') : '') : 'Add manager')+
         '</span></div>').join('') +
       '<div class="opps">' + others.map(o => {
         const c = (state.data.oppInfo||[]).find(x => x.division === d && x.team.toLowerCase() === o.toLowerCase());
         const used = fixturesIn(d, o);
         return '<span class="opp-chip"><button class="on" title="Manager & phone" data-odiv="'+esc(d)+'" data-oteam="'+esc(o)+'">'+esc(o)+
-          (c ? ' <span class="ph">👤'+(c.phone ? '📞' : '')+'</span>' : '')+'</button>'+
+          (c ? ' <span class="ph">👤'+(c.phone ? (phoneProblem(c.phone) ? '<b style="color:var(--s-warn)">⚠</b>' : '📞') : '')+'</span>' : '')+'</button>'+
           (used ? '<span class="used" title="'+used+' fixture'+(used===1?'':'s')+' – can’t be removed">'+used+'</span>'
                 : '<button title="Remove from division" data-div="'+esc(d)+'" data-rm="'+esc(o)+'">✕</button>')+'</span>';
       }).join('') +
@@ -1223,6 +1233,7 @@ function openTeam(team){
   $('t_div').value = t ? t.division : '';
   $('t_mgr').value = t ? t.manager : '';
   $('t_phone').value = t ? (t.phone || '') : '';
+  setTimeout(() => { const pp = phoneProblem($('t_phone').value); if(pp) $('teamErr').textContent = '⚠ ' + pp; }, 0);
 
   const divNames = [...new Set([...Object.keys(state.data.divisions||{}), ...(state.data.teamInfo||[]).map(x => x.division)].filter(Boolean))].sort();
   $('divDL').innerHTML = divNames.map(d => '<option value="'+esc(d)+'">').join('');
@@ -1238,13 +1249,14 @@ function openOpp(division, team){
   $('oppTitle').textContent = team;
   $('oppDiv').textContent = division + ' · shown in the details of every match against this team';
   $('o_mgr').value = c.manager || ''; $('o_phone').value = c.phone || '';
-  $('oppErr').textContent = '';
+  $('oppErr').textContent = phoneProblem(c.phone) ? '⚠ ' + phoneProblem(c.phone) : '';
   $('oppOverlay').classList.add('show');
   setTimeout(() => $('o_mgr').focus(), 50);
 }
 $('oCancel').onclick = () => $('oppOverlay').classList.remove('show');
 $('oSave').onclick = async () => {
   const o = state.editOpp; if(!o) return;
+  const pp = phoneProblem($('o_phone').value); if(pp){ $('oppErr').textContent = pp; $('o_phone').focus(); return; }
   $('oSave').disabled = true; $('oppErr').textContent = 'Saving…';
   try{
     state.data = await call('saveOpponent', state.pin, o.division, o.team, $('o_mgr').value.trim(), $('o_phone').value.trim());
@@ -1254,6 +1266,7 @@ $('oSave').onclick = async () => {
 };
 $('tSave').onclick = async () => {
   const t = state.editTeam;
+  const pp = phoneProblem($('t_phone').value); if(pp){ $('teamErr').textContent = pp; $('t_phone').focus(); return; }
   $('tSave').disabled = true; $('teamErr').textContent = 'Saving…';
   try{
     state.data = await call('saveTeam', state.pin, t ? t.team : '', $('t_name').value.trim(), $('t_div').value.trim(), $('t_mgr').value.trim(), $('t_phone').value.trim());

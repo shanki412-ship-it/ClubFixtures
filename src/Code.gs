@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.25.2';
+const APP_VERSION = '1.26.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -638,7 +638,12 @@ function payload_(s) {
   const matches = readMatches_();
   const statuses = s.statuses.slice();
   matches.forEach(m => { if (m.status && statuses.indexOf(m.status) < 0) statuses.push(m.status); });
-  const teams = Array.from(new Set(matches.map(m => m.ourTeam).concat(readTeamInfo_().map(t => t.team)).filter(Boolean))).sort();
+  // One entry per team: fixture names first; a Teams-tab name is only added if no fixture team is the same team
+  // (so "U17 Mixed Div 1" in Teams and "U17 Mixed Div 1 - Dev" in the fixtures show once).
+  const fixtureTeams = Array.from(new Set(matches.map(m => m.ourTeam).filter(Boolean)));
+  const strip = t => String(t || '').replace(/\s+-\s+[^-]+$/, '');
+  const same = (a, b) => normTeam_(a) === normTeam_(b) || normTeam_(strip(a)) === normTeam_(b) || normTeam_(a) === normTeam_(strip(b));
+  const teams = fixtureTeams.concat(readTeamInfo_().map(t => t.team).filter(t => t && !fixtureTeams.some(f => same(f, t)))).sort();
   return {
     clubName: s.clubName,
     title: s.title,
@@ -1000,9 +1005,23 @@ function addContactHeaders_() {
 }
 
 /** Phone numbers: digits, spaces, + ( ) - only. */
+/**
+ * Phone numbers for WhatsApp: Irish numbers can be typed as usual (087 123 4567 / 01 234 5678);
+ * anything else must start with + and the country code (e.g. +91 98765 43210), so WhatsApp never guesses wrong.
+ */
+function phoneProblem_(p) {
+  p = String(p || '').trim();
+  if (!p) return '';
+  if (!/^[0-9+()\-\s]{6,25}$/.test(p)) return 'Phone number can only contain digits, spaces, + ( ) -';
+  const d = p.replace(/[^0-9+]/g, '');
+  if (/^(\+|00)\d{8,15}$/.test(d)) return '';                // international, with country code
+  if (/^0\d{8,9}$/.test(d)) return '';                         // Irish: 0 + 8–9 digits
+  return 'Add the country code, e.g. +91 98765 43210 (Irish numbers can start with 0).';
+}
 function cleanPhone_(p) {
   p = String(p || '').trim().slice(0, 25);
-  if (p && !/^[0-9+()\-\s]{6,25}$/.test(p)) throw new Error('Phone number can only contain digits, spaces, + ( ) -');
+  const problem = phoneProblem_(p);
+  if (problem) throw new Error(problem);
   return p;
 }
 
