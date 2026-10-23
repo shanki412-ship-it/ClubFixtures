@@ -626,7 +626,7 @@ async function openLineup(m){
     if(/captain code/i.test(msg) && auth.code){ store.del('cap:' + m.ourTeam); store.del('cap:' + m.ourTeam, true); auth = await askCaptainCode(m.ourTeam); if(auth) return openLineup(m); return; }
     toast(msg); return;
   }
-  state.lu = { m, auth, d };
+  state.lu = { m, auth, d, added: [] };
   const home = d.home, src = d.saved || {};
   $('luTitle').textContent = m.ourTeam + ' v ' + m.opponent;
   $('luSub').textContent = (isISO(m.date) ? dayLabel(m.date) : (m.dateNote || 'Date TBC')) + (m.time ? ' · ' + m.time : '') + ' · ' + (home ? 'Home' : 'Away') + (m.place ? ' · ' + m.place : '');
@@ -649,9 +649,12 @@ function selectHTML(d, g, value){
   const names = new Set([...pool.own, ...pool.others].map(p => p.name));
   let h = '<option value="">—</option>';
   if(value && !names.has(value)) h += '<option selected>'+esc(value)+'</option>';
-  h += '<optgroup label="'+esc(state.lu.m.ourTeam)+'">' + pool.own.map(p => '<option'+(p.name===value?' selected':'')+'>'+esc(p.name)+'</option>').join('') + '</optgroup>';
+  const extra = (state.lu.added || []).filter(p => (!g || p.gender === g) && !names.has(p.name));
+  h += '<optgroup label="'+esc(state.lu.m.ourTeam)+'">' + pool.own.concat(extra).map(p =>
+    '<option value="'+esc(p.name)+'"'+(p.name===value?' selected':'')+'>'+esc(p.name)+(p.sub ? ' · sub' : '')+(p.isNew ? ' · new' : '')+'</option>').join('') + '</optgroup>';
   if(pool.others.length) h += '<optgroup label="Other club players (subs)">' + pool.others.map(p =>
     '<option value="'+esc(p.name)+'"'+(p.name===value?' selected':'')+'>'+esc(p.name)+' · '+esc(shortTeam(p.team))+'</option>').join('') + '</optgroup>';
+  h += '<option value="__new">+ Add a new name…</option>';
   return h;
 }
 function renderSlots(slots){
@@ -659,7 +662,20 @@ function renderSlots(slots){
   $('luSlots').innerHTML = d.slots.map((s, i) => '<div class="slot"><span class="sl">'+esc(s.label)+'</span><div class="pick">' +
     Array.from({length: s.n}, (_, j) => '<select data-i="'+i+'" data-j="'+j+'">' + selectHTML(d, s.g === 'BG' ? (j === 0 ? 'B' : 'G') : s.g, ((slots||[])[i]||[])[j] || '') + '</select>').join('') +
     '</div></div>').join('');
-  $('luSlots').querySelectorAll('select').forEach(el => el.onchange = checkLineup);
+  $('luSlots').querySelectorAll('select').forEach(el => el.onchange = () => {
+    if(el.value === '__new'){                                         // captain types a player not on the list
+      const s = d.slots[+el.dataset.i], g = s.g === 'BG' ? (+el.dataset.j === 0 ? 'B' : 'G') : s.g;
+      const name = (prompt('New ' + (g === 'G' ? 'girl' : g === 'B' ? 'boy' : 'player') + '’s name (added to ' + state.lu.m.ourTeam + ' when you save):') || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+      const cur = readSlots(); cur[+el.dataset.i][+el.dataset.j] = '';
+      if(name){
+        state.lu.added = state.lu.added || [];
+        if(!state.lu.added.some(p => p.name.toLowerCase() === name.toLowerCase())) state.lu.added.push({ name, gender: g, isNew: true });
+        cur[+el.dataset.i][+el.dataset.j] = name;
+      }
+      return renderSlots(cur);
+    }
+    checkLineup();
+  });
   checkLineup();
 }
 function readSlots(){
@@ -711,6 +727,7 @@ async function luSubmit(makeDoc){
     const r = await call('saveLineup', auth, m.row, m.fp, luForm(), makeDoc);
     state.data = r.data; $('luErr').textContent = '';
     if(makeDoc && r.docUrl) showDone(r.docUrl, r.pdfUrl); else toast('Line-up saved');
+    if(state.lu.added.length){ toast(state.lu.added.length + ' new name' + (state.lu.added.length===1?'':'s') + ' added to ' + m.ourTeam); state.lu.added = []; }
     render();
   }catch(e){ $('luErr').textContent = e.message || e; }
   btn.disabled = makeDoc ? !state.lu.d.templateSet : false;

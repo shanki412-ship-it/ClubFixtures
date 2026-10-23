@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.20.0';
+const APP_VERSION = '1.21.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -22,7 +22,32 @@ const PLACES_SHEET = 'Places';
 const TEAMS_SHEET = 'Teams';         // Our Team | Division | Manager
 const DIV_SHEET = 'Divisions';
 const PLAYERS_SHEET = 'Players';     // Team | Player | Gender (B/G)  – each team's pool of players
-const LINEUPS_SHEET = 'Lineups';     // one row per match line-up (written by the app)
+const LINEUPS_SHEET = 'Lineups';
+
+// Club squads 2026-27 (from the club's team sheet). Loaded into the Players tab once, only while it has no players.
+// [team, player, gender, sub]
+const DEFAULT_PLAYERS = [
+  ['U13 Boys Div 5 - A1', 'Aaryan Krithik Madamshet', 'B'], ['U13 Boys Div 5 - A1', 'Dhruva Prashanth', 'B'],
+  ['U13 Boys Div 5 - A1', 'Vedh Getty', 'B'], ['U13 Boys Div 5 - A1', 'Vrishabh Sandeep', 'B'],
+  ['U13 Boys Div 5 - A2', 'Prithiv Thimma karthick', 'B'], ['U13 Boys Div 5 - A2', 'Pranavamithran Meenatch', 'B'],
+  ['U13 Boys Div 5 - A2', 'Ishaan Dulam', 'B'], ['U13 Boys Div 5 - A2', 'Ayaan', 'B'], ['U13 Boys Div 5 - A2', 'Soham Bhardwaj', 'B', 'Sub'],
+  ['U15 Mixed Div 2', 'Aariv Shah', 'B'], ['U15 Mixed Div 2', 'Zac Graham', 'B'], ['U15 Mixed Div 2', 'Jordan Binoy', 'B'],
+  ['U15 Mixed Div 2', 'Shibhani', 'G'], ['U15 Mixed Div 2', 'Hazel Chhadwa', 'G'], ['U15 Mixed Div 2', 'Gitika', 'G'],
+  ['U15 Mixed Div 2', 'Eyazhini Sivaram', 'G', 'Sub'], ['U15 Mixed Div 2', 'Tejas Sree Sathish', 'G', 'Sub'],
+  ['U15 Boys Div 5', 'Darsh', 'B'], ['U15 Boys Div 5', 'Samagra Khandelwal', 'B'], ['U15 Boys Div 5', 'Virat Sharma', 'B'],
+  ['U15 Boys Div 5', 'Enric Albin', 'B'],
+  ['U15 Boys Div 6', 'Devansh Sud', 'B'], ['U15 Boys Div 6', 'Lochlann Campbell', 'B'], ['U15 Boys Div 6', 'Tj Keane', 'B'],
+  ['U15 Boys Div 6', 'Haahash', 'B'], ['U15 Boys Div 6', 'Joshua', 'B'],
+  ['U17 Mixed Div 1', 'Imayan Jaganathan', 'B'], ['U17 Mixed Div 1', 'Aswath Saairam Devaana', 'B'], ['U17 Mixed Div 1', 'Justin Binoy Thomas', 'B'],
+  ['U17 Mixed Div 1', 'Ira', 'G'], ['U17 Mixed Div 1', 'Lavishka', 'G'], ['U17 Mixed Div 1', 'Sukhleen Kaur Randhawa', 'G'],
+  ['U17 Mixed Div 2', 'Anish Komal Dulam', 'B'], ['U17 Mixed Div 2', 'Leon', 'B'], ['U17 Mixed Div 2', 'George Biju Mulavarickal', 'B'],
+  ['U17 Mixed Div 2', 'Sonakshi Singh', 'G'], ['U17 Mixed Div 2', 'Rajnandini Varma', 'G'], ['U17 Mixed Div 2', 'Ancika Chandrasekaran', 'G'],
+  ['U17 Mixed Div 2', 'Anvi Panse', 'G', 'Sub'],
+  ['U17 Boys Div 6', 'Arshan', 'B'], ['U17 Boys Div 6', 'Jabin Singh', 'B'], ['U17 Boys Div 6', 'Gavin Steephan', 'B'],
+  ['U17 Boys Div 6', 'Thanavanth', 'B'], ['U17 Boys Div 6', 'Devam', 'B'],
+  ['U19 Mixed Div 1', 'Aaron Joseph Paul', 'B'], ['U19 Mixed Div 1', 'Daniel Emmanuel', 'B'], ['U19 Mixed Div 1', 'Johan Selvin', 'B'],
+  ['U19 Mixed Div 1', 'Sarah Maria Binoy', 'G'], ['U19 Mixed Div 1', 'Apurva Malik', 'G'], ['U19 Mixed Div 1', 'Kezia', 'G']
+];     // one row per match line-up (written by the app)
 
 // Score-sheet slots. "B"/"G" = boy/girl slot, "BG" = mixed pair (boy + girl). n = players in the slot.
 const SHEET_SLOTS = {
@@ -171,7 +196,8 @@ function readPlayers_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(PLAYERS_SHEET);
   if (!sh) return [];
   return sh.getDataRange().getDisplayValues().slice(1)
-    .map(r => ({ team: String(r[0]).trim(), name: String(r[1]).trim(), gender: /^g/i.test(String(r[2] || '').trim()) ? 'G' : /^b/i.test(String(r[2] || '').trim()) ? 'B' : '' }))
+    .map(r => ({ team: String(r[0]).trim(), name: String(r[1]).trim(), gender: /^g/i.test(String(r[2] || '').trim()) ? 'G' : /^b/i.test(String(r[2] || '').trim()) ? 'B' : '',
+                 sub: /^(y|sub)/i.test(String(r[3] || '').trim()) }))
     .filter(p => p.team && p.name);
 }
 
@@ -253,6 +279,8 @@ function saveLineup(auth, row, fp, form, makeDoc) {
   lock.waitLock(20000);
   let docUrl = '';
   try {
+    ensurePlayersSheet_();
+    addNewPlayers_(m.ourTeam, defs, slots);
     const sh = lineupsSheet_();
     const existing = readLineups_().find(l => l.key === key);
     docUrl = existing ? existing.docUrl : '';
@@ -939,11 +967,33 @@ function fillDefaultManagers_() {
 
 function ensurePlayersSheet_() {
   const ss = SpreadsheetApp.getActive();
-  if (ss.getSheetByName(PLAYERS_SHEET)) return;
-  const sh = ss.insertSheet(PLAYERS_SHEET);
-  sh.getRange(1, 1, 1, 3).setValues([['Team', 'Player', 'Gender (B/G)']]).setFontWeight('bold');
-  sh.getRange(1, 5).setValue('One row per player. Team must match the Teams tab exactly. Gender B or G (needed for mixed teams). Row order = default order.');
-  sh.setColumnWidth(1, 200); sh.setColumnWidth(2, 240); sh.setColumnWidth(3, 110); sh.setFrozenRows(1);
+  let sh = ss.getSheetByName(PLAYERS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(PLAYERS_SHEET);
+    sh.setColumnWidth(1, 200); sh.setColumnWidth(2, 240); sh.setColumnWidth(3, 110); sh.setColumnWidth(4, 70); sh.setFrozenRows(1);
+  }
+  if (!String(sh.getRange(1, 1).getDisplayValue()).trim()) {
+    sh.getRange(1, 1, 1, 4).setValues([['Team', 'Player', 'Gender (B/G)', 'Sub']]).setFontWeight('bold');
+  }
+  if (!String(sh.getRange(1, 4).getDisplayValue()).trim()) sh.getRange(1, 4).setValue('Sub').setFontWeight('bold');
+  sh.getRange(1, 6).setValue('One row per player. Team must match the Teams tab exactly. Gender B or G (needed for mixed teams). Sub = "Sub". Row order = dropdown order. Captains can add new names from the app.');
+  if (!readPlayers_().length) {                                     // first time: load the club squads
+    const rows = DEFAULT_PLAYERS.map(r => [r[0], r[1], r[2], r[3] || '']);
+    sh.getRange(2, 1, rows.length, 4).setValues(rows);
+  }
+}
+
+/** New names typed by a captain are added to that team's list (gender from the slot they were picked for). */
+function addNewPlayers_(team, defs, slots) {
+  const known = new Set(readPlayers_().map(p => p.name.toLowerCase()));
+  const sh = SpreadsheetApp.getActive().getSheetByName(PLAYERS_SHEET);
+  if (!sh) return;
+  defs.forEach((d, i) => (slots[i] || []).forEach((name, j) => {
+    if (!name || known.has(name.toLowerCase())) return;
+    const g = d.g === 'BG' ? (j === 0 ? 'B' : 'G') : d.g;
+    sh.appendRow([team, name, g, '']);
+    known.add(name.toLowerCase());
+  }));
 }
 
 function readTeamInfo_() {
@@ -1167,9 +1217,26 @@ function getMatchesSheet_() {
   return found;
 }
 
+/** Early versions defaulted the club to "My Club": switch it (and anything saved with it) to ACBC. */
+function migrateClubName_(settingsSheet) {
+  const rows = settingsSheet.getDataRange().getDisplayValues();
+  const i = rows.findIndex(r => String(r[0]).trim().toLowerCase() === 'club name');
+  if (i < 0 || String(rows[i][1]).trim() !== 'My Club') return;
+  settingsSheet.getRange(i + 1, 2).setValue('ACBC');
+  rows.forEach((r, k) => { if (/my club/i.test(r[1]) && k !== i) settingsSheet.getRange(k + 1, 2).setValue(String(r[1]).replace(/My Club/gi, 'ACBC')); });
+  const ss = SpreadsheetApp.getActive();
+  [[TEAMS_SHEET, 7], [LINEUPS_SHEET, 9], [LINEUPS_SHEET, 10]].forEach(([n, c]) => {
+    const sh = ss.getSheetByName(n);
+    if (!sh || sh.getLastRow() < 2) return;
+    const r = sh.getRange(2, c, sh.getLastRow() - 1, 1);
+    r.setValues(r.getDisplayValues().map(x => [String(x[0]).replace(/My Club/gi, 'ACBC')]));
+  });
+}
+
 function ensureSettings_() {
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(SETTINGS_SHEET);
+  if (sh) migrateClubName_(sh);
   if (sh) {                                         // older sheets: rename "Admin PINs" → "Admin Passwords"
     const col = sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), 1).getDisplayValues();
     const i = col.findIndex(r => String(r[0]).trim().toLowerCase() === 'admin pins');
