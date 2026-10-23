@@ -196,6 +196,12 @@
   .lufoot{display:flex;gap:6px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);flex:0 0 auto;background:var(--card)}
   .lufoot .btn{padding:10px 6px;font-size:14px}
   .ludone .pdf{background:var(--navy);color:#fff} .ludone .gdoc{border:1.5px solid var(--accent);color:var(--accent)}
+  .ludone.err{background:color-mix(in srgb,var(--s-bad) 12%,var(--card));color:var(--s-bad)}
+  .ludone.busy{display:flex;align-items:center;gap:8px}
+  .ludone .fn{font-size:12px;color:var(--muted);word-break:break-word}
+  .spin{width:16px;height:16px;border:2.5px solid color-mix(in srgb,var(--accent) 30%,transparent);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex:0 0 auto}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion: reduce){ .spin{animation-duration:2.4s} }
   .reports{display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px solid var(--accent);color:var(--accent);
     background:color-mix(in srgb,var(--mint) 10%,var(--card));border-radius:8px;padding:7px 10px;font-size:13px;font-weight:700;text-decoration:none}
   .reports span{font-weight:400}
@@ -653,9 +659,8 @@ async function openLineup(m){
   $('luDet').classList.remove('open'); updateSummary();
   renderSlots(d.saved ? d.saved.slots : defaultSlots(d));
   $('luErr').textContent = ''; $('luDone').style.display = 'none';
-  if(d.saved && d.saved.docUrl) showDone(d.saved.docUrl);
-  $('luMake').disabled = !d.templateSet;
-  $('luMake').title = d.templateSet ? '' : 'The match-sheet template isn’t set up yet (Settings)';
+  if(d.saved && d.saved.docUrl) luStatus('ok', '✓ Match sheet created before (' + esc(d.saved.docUrl.replace(/^Word sheet /,'')) + '). Tap <b>Create sheet</b> to download it again.');
+  $('luMake').disabled = false; $('luMake').textContent = 'Create sheet';
   if(!d.own.length) $('luErr').textContent = 'No players found for ' + m.ourTeam + ' in the Players tab. Ask an admin to run Fixtures App → Match sheets: check setup.';
   $('luOverlay').classList.add('show');
 }
@@ -737,25 +742,76 @@ function updateSummary(){
 $('luSum').onclick = () => { const o = $('luDet').classList.toggle('open'); $('luSum').setAttribute('aria-expanded', o); };
 ['age','division','section','homeName','awayName'].forEach(k => $('lu_'+k).addEventListener('input', updateSummary));
 function luForm(){ const f = { slots: readSlots() }; ['age','division','section','homeName','awayName'].forEach(k => f[k] = $('lu_'+k).value.trim()); return f; }
-function showDone(docUrl, pdfUrl){
-  const id = (docUrl.match(/[-\w]{25,}/)||[''])[0];
-  pdfUrl = pdfUrl || (id ? 'https://docs.google.com/document/d/'+id+'/export?format=pdf' : '');
-  $('luDone').innerHTML = '✓ Match sheet ready <a class="pdf" target="_blank" rel="noopener" href="'+esc(pdfUrl)+'">🖨 Open PDF to print</a>' +
-    '<a class="gdoc" target="_blank" rel="noopener" href="'+esc(docUrl)+'">Open in Google Docs</a>';
-  $('luDone').style.display = 'block';
+// Status panel inside the line-up sheet: 'busy' (spinner), 'ok' or 'err'
+function luStatus(kind, html){
+  const el = $('luDone');
+  el.className = 'ludone ' + kind;
+  el.innerHTML = (kind === 'busy' ? '<span class="spin" aria-hidden="true"></span>' : '') + html;
+  el.style.display = 'block';
+  el.scrollIntoView({ block: 'nearest' });
+}
+// JSZip is only loaded the first time someone creates a sheet
+function loadZip(){
+  if(window.JSZip) return Promise.resolve(window.JSZip);
+  return new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    sc.onload = () => res(window.JSZip); sc.onerror = () => rej(new Error('Couldn’t load the Word builder – check your internet connection and try again.'));
+    document.head.appendChild(sc);
+  });
+}
+const xmlEsc = v => String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// Fill the league template ({{AGE}}, {{H1}}…) and return a .docx Blob
+async function buildDocx(sheet){
+  const JSZip = await loadZip();
+  const zip = await JSZip.loadAsync(sheet.docx, { base64: true });
+  if(sheet.type === 'mixed'){                     // same fonts/images, mixed page layout
+    const qr = await zip.file('word/media/image1.png').async('uint8array');
+    const logo = await zip.file('word/media/image2.jpg').async('uint8array');
+    zip.remove('word/media/image1.png'); zip.remove('word/media/image2.jpg');
+    zip.file('word/media/image2.png', qr); zip.file('word/media/image1.jpg', logo);
+    zip.file('word/document.xml', sheet.mixedXml);
+    zip.file('word/_rels/document.xml.rels', sheet.mixedRels);
+  }
+  let xml = await zip.file('word/document.xml').async('string');
+  Object.keys(sheet.values).forEach(k => { xml = xml.split('{{' + k + '}}').join(xmlEsc(sheet.values[k])); });
+  xml = xml.replace(/\{\{[A-Z_0-9]+\}\}/g, '');
+  zip.file('word/document.xml', xml);
+  return zip.generateAsync({ type: 'blob', compression: 'DEFLATE',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+function downloadBlob(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  return url;
 }
 async function luSubmit(makeDoc){
   const { m, auth } = state.lu;
   const btn = makeDoc ? $('luMake') : $('luSave');
-  btn.disabled = true; $('luErr').textContent = makeDoc ? 'Creating the match sheet… (about 10 seconds)' : 'Saving…';
+  if(btn.disabled) return;
+  btn.disabled = true; $('luErr').textContent = '';
+  const label = btn.textContent;
+  btn.textContent = makeDoc ? 'Creating…' : 'Saving…';
+  if(makeDoc) luStatus('busy', 'Saving the line-up and preparing your match sheet…');
   try{
     const r = await call('saveLineup', auth, m.row, m.fp, luForm(), makeDoc);
-    state.data = r.data; $('luErr').textContent = '';
-    if(makeDoc && r.docUrl) showDone(r.docUrl, r.pdfUrl); else toast('Line-up saved');
+    state.data = r.data;
+    if(makeDoc && r.sheet){
+      luStatus('busy', 'Building the Word file…');
+      const blob = await buildDocx(r.sheet);
+      const url = downloadBlob(blob, r.sheet.fileName);
+      luStatus('ok', '✓ <b>Match sheet downloaded</b><br><span class="fn">' + esc(r.sheet.fileName) + '</span><br>' +
+        'Open it from your Downloads and print. <a class="pdf" href="' + url + '" download="' + esc(r.sheet.fileName) + '">⬇ Download again</a>');
+    } else {
+      luStatus('ok', '✓ Line-up saved');
+    }
     if(state.lu.added.length){ toast(state.lu.added.length + ' new name' + (state.lu.added.length===1?'':'s') + ' added to ' + m.ourTeam); state.lu.added = []; }
     render();
-  }catch(e){ $('luErr').textContent = e.message || e; }
-  btn.disabled = makeDoc ? !state.lu.d.templateSet : false;
+  }catch(e){
+    luStatus('err', '⚠ ' + esc(e.message || e));
+  }
+  btn.disabled = false; btn.textContent = label;
 }
 $('luSave').onclick = () => luSubmit(false);
 $('luMake').onclick = () => luSubmit(true);

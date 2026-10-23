@@ -167,16 +167,17 @@ Captains fill the line-up in the app and get the league score sheet filled in an
   age group / division / section / team names are pre-filled → pick players from dropdowns (our team's pool first,
   only that team's players, plus **+ Add a new name…**, which is saved to that team's list) → **↻ Fill pairs** builds the doubles and mixed pairs from the singles →
   the rules check warns if anyone doesn't play exactly two matches (mixed: one must be mixed doubles).
-- **Create match sheet** copies the template, fills it (our players in the home or away column), saves it in the
-  *Match Sheets* folder in Drive (view-only link) and shows **🖨 Open PDF to print**. Creating it again replaces it.
-- The line-up, section and our team's name on the sheet are remembered (Lineups and Teams tabs).
+- **Create sheet** shows progress ("preparing… / building the Word file…"), then downloads a Word file
+  (`2026-11-07 U15 Mixed Div 2 v Kerela 1 (Away).docx`) in the league's own Boys or Mixed format, with our players in
+  the home or away column. Open it from Downloads and print. No Google Drive set-up or permission is needed.
+- The line-up, section and our team's name on the sheet are remembered (Lineups and Teams tabs), and the match shows
+  "✓ ready" in its details.
 
-Templates (`templates/` in this repo) are the league sheets with `{{placeholders}}`:
-`{{AGE}} {{DIVISION}} {{SECTION}} {{HOME_TEAM}} {{AWAY_TEAM}} {{LOCATION}} {{DATE}}`, and `{{H1}}…` / `{{A1}}…` for the
-home / away player rows (Boys: 6 rows, Mixed: 7 rows).
-Setup: upload both to Google Drive, open each with Google Docs (File → Save as Google Docs), paste the links into
-**Settings → Boys / Mixed Match Sheet Template**, then sheet menu **Fixtures App → Match sheets: check setup**
-(this also asks for the Drive/Docs permission the first time).
+The templates are built into the app (`src/SheetTemplates.gs`, made from `templates/*.docx`): the league sheets with
+`{{AGE}} {{DIVISION}} {{SECTION}} {{HOME_TEAM}} {{AWAY_TEAM}} {{LOCATION}} {{DATE}}` and `{{H1}}…` / `{{A1}}…` for the
+home / away player rows (Boys: 6 rows, Mixed: 7). The QR code was reduced to print resolution (it still scans to the
+same link); the Roboto fonts are kept so the sheet looks the same in Word. To change a template, edit the .docx in
+`templates/` and ask Claude to rebuild `SheetTemplates.gs`.
 
 ## Monday fixtures email
 

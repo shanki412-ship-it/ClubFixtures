@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.22.1';
+const APP_VERSION = '1.23.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -87,9 +87,6 @@ const DEFAULT_SETTINGS = [
   ['Icon URL', '', 'Browser-tab icon: upload acbc-icon-512.png to Google Drive, share "Anyone with the link", paste the link here'],
   ['Home Location', 'Celbridge', 'Location used for home matches that have no location filled in'],
   ['Match Reports URL', 'https://sites.google.com/view/dubjuvleague/match-reports', 'League page with the match scoring sheets (shown in the app and the Monday email)'],
-  ['Boys Match Sheet Template', '', 'Google Doc link of the boys score-sheet template (with {{…}} placeholders)'],
-  ['Mixed Match Sheet Template', '', 'Google Doc link of the mixed score-sheet template (with {{…}} placeholders)'],
-  ['Match Sheets Folder', '', 'Drive folder for filled-in match sheets (created automatically if blank)'],
   ['Weekly Email To', '', 'Who gets the Monday fixtures email: email addresses separated by commas'],
   ['Statuses', 'Not Scheduled, Scheduled, Confirmed, Postponed, Cancelled, Played', 'Options in the status dropdown']
 ];
@@ -314,11 +311,10 @@ function getLineupData(auth, row, fp) {
   const players = readPlayers_();
   const own = playersOfTeam_(m.ourTeam, players).map(p => ({ name: p.name, gender: p.gender, sub: p.sub }));
   return { who: who, type: type, slots: SHEET_SLOTS[type], own: own, others: [],     // only this team's players
-           saved: saved, defaults: lineupDefaults_(m), home: /^home/i.test(m.venue),
-           templateSet: !!docIdFrom_(type === 'mixed' ? getSettings_().mixedTemplate : getSettings_().boysTemplate) };
+           saved: saved, defaults: lineupDefaults_(m), home: /^home/i.test(m.venue), templateSet: true };
 }
 
-/** Save the line-up; with makeDoc, also (re)create the filled-in Google Doc. */
+/** Save the line-up; with makeDoc, also return what the page needs to build the Word score sheet. */
 function saveLineup(auth, row, fp, form, makeDoc) {
   const m = findMatchByRow_(row, fp);
   authorizeTeam_(auth, m.ourTeam);
@@ -338,7 +334,7 @@ function saveLineup(auth, row, fp, form, makeDoc) {
     const sh = lineupsSheet_();
     const existing = readLineups_().find(l => l.key === key);
     docUrl = existing ? existing.docUrl : '';
-    if (makeDoc) docUrl = buildMatchDoc_(m, type, f, slots, existing && existing.docUrl);
+    if (makeDoc) docUrl = 'Word sheet ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'd MMM HH:mm');
     const rowNo = existing ? existing.row : sh.getLastRow() + 1;
     sh.getRange(rowNo, 1, 1, 13).setNumberFormat('@').setValues([[key, m.ourTeam, m.opponent, m.venue, m.date || m.dateNote,
       f.age, f.division, f.section, f.homeName, f.awayName, JSON.stringify(slots), docUrl,
@@ -354,9 +350,19 @@ function saveLineup(auth, row, fp, form, makeDoc) {
   } finally {
     lock.releaseLock();
   }
-  const id = docIdFrom_(docUrl);
-  return { docUrl: docUrl, pdfUrl: id ? 'https://docs.google.com/document/d/' + id + '/export?format=pdf' : '',
-           data: payload_(getSettings_()) };
+  const out = { data: payload_(getSettings_()) };
+  if (makeDoc) {
+    out.sheet = {
+      type: type,
+      values: sheetValues_(m, type, f, slots),
+      fileName: ((m.date || 'TBC') + ' ' + m.ourTeam + ' v ' + m.opponent + (/^home/i.test(m.venue) ? ' (Home)' : ' (Away)'))
+        .replace(/[\\/:*?"<>|]+/g, '-') + '.docx',
+      docx: SHEET_TEMPLATE_DOCX_B64,
+      mixedXml: type === 'mixed' ? MIXED_SHEET_DOCUMENT_XML : '',
+      mixedRels: type === 'mixed' ? MIXED_SHEET_DOCUMENT_RELS : ''
+    };
+  }
+  return out;
 }
 
 /** Values for the template's {{placeholders}}. Our players go on the home (H) or away (A) side. */
@@ -373,50 +379,9 @@ function sheetValues_(m, type, f, slots) {
   return v;
 }
 
-function buildMatchDoc_(m, type, f, slots, oldUrl) {
-  const s = getSettings_();
-  const tplId = docIdFrom_(type === 'mixed' ? s.mixedTemplate : s.boysTemplate);
-  if (!tplId) throw new Error('The ' + type + ' match-sheet template isn\'t set up yet. Ask an admin to add its link in Settings.');
-  const folder = matchSheetsFolder_();
-  const name = (m.date || 'TBC') + ' ' + m.ourTeam + ' v ' + m.opponent + (/^home/i.test(m.venue) ? ' (Home)' : ' (Away)');
-  const old = docIdFrom_(oldUrl);
-  if (old) { try { DriveApp.getFileById(old).setTrashed(true); } catch (e) {} }   // re-generating replaces the old sheet
-  const copy = DriveApp.getFileById(tplId).makeCopy(name, folder);
-  try { copy.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
-  const doc = DocumentApp.openById(copy.getId());
-  const body = doc.getBody();
-  const vals = sheetValues_(m, type, f, slots);
-  Object.keys(vals).forEach(k => body.replaceText('\\{\\{' + k + '\\}\\}', String(vals[k] || '').replace(/\$/g, '')));
-  body.replaceText('\\{\\{[A-Z_0-9]+\\}\\}', '');                     // anything unused
-  doc.saveAndClose();
-  return doc.getUrl();
-}
-
-function matchSheetsFolder_() {
-  const s = getSettings_();
-  const id = docIdFrom_(s.sheetsFolder);
-  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
-  const folder = DriveApp.createFolder(s.title + ' – Match Sheets');
-  const sh = ensureSettings_();
-  const rows = sh.getDataRange().getDisplayValues();
-  const i = rows.findIndex(r => String(r[0]).trim().toLowerCase() === 'match sheets folder');
-  if (i >= 0) sh.getRange(i + 1, 2).setValue(folder.getUrl());
-  return folder;
-}
-
-/** Menu: checks templates and folder (and triggers Google's permission prompt the first time). */
+/** Menu: players per team and captain codes. */
 function checkMatchSheetSetup() {
-  const s = getSettings_(), msgs = [];
-  [['Boys', s.boysTemplate], ['Mixed', s.mixedTemplate]].forEach(([n, url]) => {
-    const id = docIdFrom_(url);
-    if (!id) { msgs.push('✗ ' + n + ' template: not set (Settings → ' + n + ' Match Sheet Template)'); return; }
-    try {
-      const text = DocumentApp.openById(id).getBody().getText();
-      const missing = ['AGE', 'DIVISION', 'HOME_TEAM', 'AWAY_TEAM', 'LOCATION', 'DATE', 'H1', 'A1'].filter(k => text.indexOf('{{' + k + '}}') < 0);
-      msgs.push((missing.length ? '⚠ ' : '✓ ') + n + ' template OK' + (missing.length ? ' but missing {{' + missing.join('}}, {{') + '}}' : ''));
-    } catch (e) { msgs.push('✗ ' + n + ' template: can\'t open it (is it a Google Doc in your Drive?)'); }
-  });
-  try { msgs.push('✓ Folder: ' + matchSheetsFolder_().getName()); } catch (e) { msgs.push('✗ Folder: ' + e.message); }
+  const msgs = ['✓ Score-sheet templates are built in (Word download)'];
   const pl = readPlayers_(), players = pl.length, codes = readTeamInfo_().filter(t => t.code).length;
   msgs.push((players ? '✓ ' : '⚠ ') + players + ' players in the Players tab');
   ourTeamNames_().sort().forEach(t => {
@@ -1341,9 +1306,6 @@ function getSettings_() {
     title: kv['app title'] || 'ACBC Juvenile League 2026-27',
     homeLocation: kv['home location'] || 'Celbridge',
     iconUrl: kv['icon url'] || '',
-    boysTemplate: kv['boys match sheet template'] || '',
-    mixedTemplate: kv['mixed match sheet template'] || '',
-    sheetsFolder: kv['match sheets folder'] || '',
     reportsUrl: /^https:\/\//i.test(kv['match reports url'] || '') ? kv['match reports url'] : '',
     weeklyEmailTo: list(kv['weekly email to']).filter(e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)),
     adminPins: list(kv['admin passwords'] || kv['admin pins']),
