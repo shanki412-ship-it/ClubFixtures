@@ -152,6 +152,29 @@ teams with fixtures show their match count instead, and the server refuses the r
 **📝 Match reports & scoring sheets** button on the Fixtures tab, in each match's details, and in the Monday email.
 Change or clear it in Settings; it must start with https://.
 
+## Line-ups & match sheets
+
+Captains fill the line-up in the app and get the league score sheet filled in and ready to print.
+
+- **Players tab** (created automatically): `Team | Player | Gender (B/G)`, one row per player. Team must match the
+  Teams tab. Gender is needed for mixed teams. Row order is the default order in the dropdowns.
+- **Captain codes**: Admin → Teams & managers → tap our team → *Captain code*. A code only works for its own team;
+  admins can do every team. Codes are never sent to the page.
+- **On a match**: tap it → **📝 Line-up & match sheet** → enter the captain code (remembered on that phone) →
+  age group / division / section / team names are pre-filled → pick players from dropdowns (our team's pool first,
+  other club players listed as subs) → **↻ Fill pairs** builds the doubles and mixed pairs from the singles →
+  the rules check warns if anyone doesn't play exactly two matches (mixed: one must be mixed doubles).
+- **Create match sheet** copies the template, fills it (our players in the home or away column), saves it in the
+  *Match Sheets* folder in Drive (view-only link) and shows **🖨 Open PDF to print**. Creating it again replaces it.
+- The line-up, section and our team's name on the sheet are remembered (Lineups and Teams tabs).
+
+Templates (`templates/` in this repo) are the league sheets with `{{placeholders}}`:
+`{{AGE}} {{DIVISION}} {{SECTION}} {{HOME_TEAM}} {{AWAY_TEAM}} {{LOCATION}} {{DATE}}`, and `{{H1}}…` / `{{A1}}…` for the
+home / away player rows (Boys: 6 rows, Mixed: 7 rows).
+Setup: upload both to Google Drive, open each with Google Docs (File → Save as Google Docs), paste the links into
+**Settings → Boys / Mixed Match Sheet Template**, then sheet menu **Fixtures App → Match sheets: check setup**
+(this also asks for the Drive/Docs permission the first time).
+
 ## Monday fixtures email
 
 Every Monday around 7–8am (Dublin time) the app emails that week's matches (Monday–Sunday): grouped by day,

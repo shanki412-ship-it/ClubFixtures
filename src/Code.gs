@@ -13,14 +13,31 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.19.0';
+const APP_VERSION = '1.20.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
 const SETTINGS_SHEET = 'Settings';
 const PLACES_SHEET = 'Places';
 const TEAMS_SHEET = 'Teams';         // Our Team | Division | Manager
-const DIV_SHEET = 'Divisions';       // Division | Team  (every team in each division, ours and opponents)
+const DIV_SHEET = 'Divisions';
+const PLAYERS_SHEET = 'Players';     // Team | Player | Gender (B/G)  – each team's pool of players
+const LINEUPS_SHEET = 'Lineups';     // one row per match line-up (written by the app)
+
+// Score-sheet slots. "B"/"G" = boy/girl slot, "BG" = mixed pair (boy + girl). n = players in the slot.
+const SHEET_SLOTS = {
+  boys: [
+    { label: 'Singles 1', n: 1, g: 'B' }, { label: 'Singles 2', n: 1, g: 'B' },
+    { label: 'Singles 3', n: 1, g: 'B' }, { label: 'Singles 4', n: 1, g: 'B' },
+    { label: '1st Boys Doubles', n: 2, g: 'B' }, { label: '2nd Boys Doubles', n: 2, g: 'B' }
+  ],
+  mixed: [
+    { label: 'Boys Singles', n: 1, g: 'B' }, { label: 'Girls Singles', n: 1, g: 'G' },
+    { label: 'Boys Doubles', n: 2, g: 'B' }, { label: 'Girls Doubles', n: 2, g: 'G' },
+    { label: '1st Mixed Doubles', n: 2, g: 'BG' }, { label: '2nd Mixed Doubles', n: 2, g: 'BG' },
+    { label: '3rd Mixed Doubles', n: 2, g: 'BG' }
+  ]
+};       // Division | Team  (every team in each division, ours and opponents)
 
 const FIELDS = [
   { key: 'ourTeam',  header: 'our team' },
@@ -45,6 +62,9 @@ const DEFAULT_SETTINGS = [
   ['Icon URL', '', 'Browser-tab icon: upload acbc-icon-512.png to Google Drive, share "Anyone with the link", paste the link here'],
   ['Home Location', 'Celbridge', 'Location used for home matches that have no location filled in'],
   ['Match Reports URL', 'https://sites.google.com/view/dubjuvleague/match-reports', 'League page with the match scoring sheets (shown in the app and the Monday email)'],
+  ['Boys Match Sheet Template', '', 'Google Doc link of the boys score-sheet template (with {{…}} placeholders)'],
+  ['Mixed Match Sheet Template', '', 'Google Doc link of the mixed score-sheet template (with {{…}} placeholders)'],
+  ['Match Sheets Folder', '', 'Drive folder for filled-in match sheets (created automatically if blank)'],
   ['Weekly Email To', '', 'Who gets the Monday fixtures email: email addresses separated by commas'],
   ['Statuses', 'Not Scheduled, Scheduled, Confirmed, Postponed, Cancelled, Played', 'Options in the status dropdown']
 ];
@@ -109,6 +129,8 @@ function onOpen() {
     .addItem('Set up Settings, Places, Teams & Divisions tabs', 'setup')
     .addItem('Split time into Time + Location columns', 'splitIntoSeparateColumns')
     .addSeparator()
+    .addItem('Match sheets: check setup', 'checkMatchSheetSetup')
+    .addSeparator()
     .addItem('Weekly email: send a test now (next week)', 'sendWeeklyEmailTest')
     .addItem('Weekly email: turn ON (Mondays ~7am)', 'turnOnWeeklyEmail')
     .addItem('Weekly email: turn OFF', 'turnOffWeeklyEmail')
@@ -122,6 +144,201 @@ function setup() {
   ensureSettings_();
   ensurePlaces_();
   ensureTeamSheets_();
+}
+
+/* ---------------- Line-ups & match sheets ---------------- */
+
+function matchKey_(m) { return [m.ourTeam, m.opponent, /^home/i.test(m.venue) ? 'H' : /^away/i.test(m.venue) ? 'A' : 'N'].join('|').toLowerCase(); }
+function sheetType_(team, division) { return /mixed/i.test(team + ' ' + (division || '')) ? 'mixed' : 'boys'; }
+function docIdFrom_(url) { return (String(url || '').match(/[-\w]{25,}/) || [''])[0]; }
+
+/** A captain code for that team, or an admin password. Never says which part was wrong. */
+function authorizeTeam_(auth, team) {
+  auth = auth || {};
+  const pins = getSettings_().adminPins;
+  if (auth.pin && pins.indexOf(String(auth.pin).trim()) >= 0) return 'admin';
+  const t = readTeamInfo_().find(x => x.team.toLowerCase() === String(team || '').toLowerCase());
+  if (t && t.code && auth.code && String(auth.code).trim().toLowerCase() === t.code.toLowerCase()) return 'captain';
+  Utilities.sleep(1200);
+  throw new Error('Captain code not recognised for ' + team + '.');
+}
+
+function verifyCaptain(team, code) {
+  try { authorizeTeam_({ code: code }, team); return true; } catch (e) { return false; }
+}
+
+function readPlayers_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(PLAYERS_SHEET);
+  if (!sh) return [];
+  return sh.getDataRange().getDisplayValues().slice(1)
+    .map(r => ({ team: String(r[0]).trim(), name: String(r[1]).trim(), gender: /^g/i.test(String(r[2] || '').trim()) ? 'G' : /^b/i.test(String(r[2] || '').trim()) ? 'B' : '' }))
+    .filter(p => p.team && p.name);
+}
+
+function lineupsSheet_() {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(LINEUPS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(LINEUPS_SHEET);
+    sh.getRange(1, 1, 1, 13).setValues([['Key', 'Our Team', 'Opponent', 'Venue', 'Date', 'Age Group', 'Division', 'Section',
+      'Home Name', 'Away Name', 'Slots (JSON)', 'Doc URL', 'Updated']]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function readLineups_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(LINEUPS_SHEET);
+  if (!sh) return [];
+  return sh.getDataRange().getDisplayValues().slice(1).map((r, i) => {
+    let slots = []; try { slots = JSON.parse(r[10] || '[]'); } catch (e) {}
+    return { key: r[0], ourTeam: r[1], opponent: r[2], venue: r[3], date: r[4], age: r[5], division: r[6], section: r[7],
+             homeName: r[8], awayName: r[9], slots: slots, docUrl: r[11], updated: r[12], row: i + 2 };
+  }).filter(l => l.key);
+}
+
+/** For the fixtures list: which matches already have a match sheet (no names, safe for everyone). */
+function readLineupFlags_() {
+  const out = {};
+  readLineups_().forEach(l => { out[l.key] = l.docUrl ? 'doc' : 'saved'; });
+  return out;
+}
+
+function lineupDefaults_(m) {
+  const s = getSettings_();
+  const t = readTeamInfo_().find(x => x.team.toLowerCase() === m.ourTeam.toLowerCase()) || {};
+  const division = t.division || guessDivision_(m.ourTeam);
+  const age = (m.ourTeam.match(/U\s?\d+/i) || [''])[0].replace(/\s/g, '').toUpperCase();
+  const divNo = (division.match(/div\w*\s*(\d+)/i) || [])[1];
+  const suffix = (m.ourTeam.match(/-\s*(\w+)\s*$/) || [])[1];
+  const ours = t.sheetName || (s.clubName + (suffix ? ' ' + suffix : ''));
+  const home = /^home/i.test(m.venue);
+  return { age: age, division: divNo ? 'Div ' + divNo : division.replace(/^U\s?\d+\s*/i, ''), section: t.section || '',
+           homeName: home ? ours : m.opponent, awayName: home ? m.opponent : ours };
+}
+
+function findMatchByRow_(row, fp) {
+  const m = readMatches_().find(x => x.row === Number(row));
+  if (!m || (fp && m.fp !== fp)) throw new Error('This match was changed or moved. Tap refresh and try again.');
+  return m;
+}
+
+/** Everything the line-up screen needs. Players' names are only sent to that team's captain or an admin. */
+function getLineupData(auth, row, fp) {
+  const m = findMatchByRow_(row, fp);
+  const who = authorizeTeam_(auth, m.ourTeam);
+  const t = readTeamInfo_().find(x => x.team.toLowerCase() === m.ourTeam.toLowerCase()) || {};
+  const type = sheetType_(m.ourTeam, t.division);
+  const saved = readLineups_().find(l => l.key === matchKey_(m)) || null;
+  const players = readPlayers_();
+  const own = players.filter(p => p.team.toLowerCase() === m.ourTeam.toLowerCase());
+  const others = players.filter(p => p.team.toLowerCase() !== m.ourTeam.toLowerCase());
+  return { who: who, type: type, slots: SHEET_SLOTS[type], own: own, others: others,
+           saved: saved, defaults: lineupDefaults_(m), home: /^home/i.test(m.venue),
+           templateSet: !!docIdFrom_(type === 'mixed' ? getSettings_().mixedTemplate : getSettings_().boysTemplate) };
+}
+
+/** Save the line-up; with makeDoc, also (re)create the filled-in Google Doc. */
+function saveLineup(auth, row, fp, form, makeDoc) {
+  const m = findMatchByRow_(row, fp);
+  authorizeTeam_(auth, m.ourTeam);
+  const t = readTeamInfo_().find(x => x.team.toLowerCase() === m.ourTeam.toLowerCase()) || {};
+  const type = sheetType_(m.ourTeam, t.division), defs = SHEET_SLOTS[type];
+  const clean = v => String(v || '').trim().slice(0, 60);
+  const slots = defs.map((d, i) => ((form.slots || [])[i] || []).slice(0, d.n).map(clean));
+  const f = { age: clean(form.age), division: clean(form.division), section: clean(form.section),
+              homeName: clean(form.homeName), awayName: clean(form.awayName) };
+  const key = matchKey_(m);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  let docUrl = '';
+  try {
+    const sh = lineupsSheet_();
+    const existing = readLineups_().find(l => l.key === key);
+    docUrl = existing ? existing.docUrl : '';
+    if (makeDoc) docUrl = buildMatchDoc_(m, type, f, slots, existing && existing.docUrl);
+    const rowNo = existing ? existing.row : sh.getLastRow() + 1;
+    sh.getRange(rowNo, 1, 1, 13).setNumberFormat('@').setValues([[key, m.ourTeam, m.opponent, m.venue, m.date || m.dateNote,
+      f.age, f.division, f.section, f.homeName, f.awayName, JSON.stringify(slots), docUrl,
+      Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')]]);
+    // remember section / our name on the score sheet for next time
+    const tsh = SpreadsheetApp.getActive().getSheetByName(TEAMS_SHEET);
+    if (tsh && t.row) {
+      addContactHeaders_();
+      const ourName = /^home/i.test(m.venue) ? f.homeName : f.awayName;
+      tsh.getRange(t.row, 6, 1, 2).setNumberFormat('@').setValues([[f.section, ourName]]);
+    }
+    SpreadsheetApp.flush();
+  } finally {
+    lock.releaseLock();
+  }
+  const id = docIdFrom_(docUrl);
+  return { docUrl: docUrl, pdfUrl: id ? 'https://docs.google.com/document/d/' + id + '/export?format=pdf' : '',
+           data: payload_(getSettings_()) };
+}
+
+/** Values for the template's {{placeholders}}. Our players go on the home (H) or away (A) side. */
+function sheetValues_(m, type, f, slots) {
+  const tz = Session.getScriptTimeZone();
+  const v = { AGE: f.age, DIVISION: f.division, SECTION: f.section, HOME_TEAM: f.homeName, AWAY_TEAM: f.awayName,
+              LOCATION: m.place && !/^internal$/i.test(m.place) ? m.place : (m.place || 'TBC'),
+              DATE: m.date ? Utilities.formatDate(toDate_(m.date), tz, 'EEE d MMM yyyy') + (m.time ? ', ' + m.time : '') : (m.dateNote || '') };
+  const side = /^home/i.test(m.venue) ? 'H' : 'A', other = side === 'H' ? 'A' : 'H';
+  SHEET_SLOTS[type].forEach((d, i) => {
+    v[side + (i + 1)] = (slots[i] || []).filter(Boolean).join(' / ');
+    v[other + (i + 1)] = '';
+  });
+  return v;
+}
+
+function buildMatchDoc_(m, type, f, slots, oldUrl) {
+  const s = getSettings_();
+  const tplId = docIdFrom_(type === 'mixed' ? s.mixedTemplate : s.boysTemplate);
+  if (!tplId) throw new Error('The ' + type + ' match-sheet template isn\'t set up yet. Ask an admin to add its link in Settings.');
+  const folder = matchSheetsFolder_();
+  const name = (m.date || 'TBC') + ' ' + m.ourTeam + ' v ' + m.opponent + (/^home/i.test(m.venue) ? ' (Home)' : ' (Away)');
+  const old = docIdFrom_(oldUrl);
+  if (old) { try { DriveApp.getFileById(old).setTrashed(true); } catch (e) {} }   // re-generating replaces the old sheet
+  const copy = DriveApp.getFileById(tplId).makeCopy(name, folder);
+  try { copy.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+  const doc = DocumentApp.openById(copy.getId());
+  const body = doc.getBody();
+  const vals = sheetValues_(m, type, f, slots);
+  Object.keys(vals).forEach(k => body.replaceText('\\{\\{' + k + '\\}\\}', String(vals[k] || '').replace(/\$/g, '')));
+  body.replaceText('\\{\\{[A-Z_0-9]+\\}\\}', '');                     // anything unused
+  doc.saveAndClose();
+  return doc.getUrl();
+}
+
+function matchSheetsFolder_() {
+  const s = getSettings_();
+  const id = docIdFrom_(s.sheetsFolder);
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
+  const folder = DriveApp.createFolder(s.title + ' – Match Sheets');
+  const sh = ensureSettings_();
+  const rows = sh.getDataRange().getDisplayValues();
+  const i = rows.findIndex(r => String(r[0]).trim().toLowerCase() === 'match sheets folder');
+  if (i >= 0) sh.getRange(i + 1, 2).setValue(folder.getUrl());
+  return folder;
+}
+
+/** Menu: checks templates and folder (and triggers Google's permission prompt the first time). */
+function checkMatchSheetSetup() {
+  const s = getSettings_(), msgs = [];
+  [['Boys', s.boysTemplate], ['Mixed', s.mixedTemplate]].forEach(([n, url]) => {
+    const id = docIdFrom_(url);
+    if (!id) { msgs.push('✗ ' + n + ' template: not set (Settings → ' + n + ' Match Sheet Template)'); return; }
+    try {
+      const text = DocumentApp.openById(id).getBody().getText();
+      const missing = ['AGE', 'DIVISION', 'HOME_TEAM', 'AWAY_TEAM', 'LOCATION', 'DATE', 'H1', 'A1'].filter(k => text.indexOf('{{' + k + '}}') < 0);
+      msgs.push((missing.length ? '⚠ ' : '✓ ') + n + ' template OK' + (missing.length ? ' but missing {{' + missing.join('}}, {{') + '}}' : ''));
+    } catch (e) { msgs.push('✗ ' + n + ' template: can\'t open it (is it a Google Doc in your Drive?)'); }
+  });
+  try { msgs.push('✓ Folder: ' + matchSheetsFolder_().getName()); } catch (e) { msgs.push('✗ Folder: ' + e.message); }
+  const players = readPlayers_().length, codes = readTeamInfo_().filter(t => t.code).length;
+  msgs.push((players ? '✓ ' : '⚠ ') + players + ' players in the Players tab');
+  msgs.push((codes ? '✓ ' : '⚠ ') + codes + ' team(s) have a captain code (Admin → Teams & managers)');
+  try { SpreadsheetApp.getUi().alert('Match sheets setup\n\n' + msgs.join('\n')); } catch (e) { console.log(msgs.join('\n')); }
 }
 
 /* ---------------- Monday email ---------------- */
@@ -266,7 +483,7 @@ function appVersion_() { return APP_VERSION + (BUILD.indexOf('__') === 0 ? '' : 
 function dataStamp_() {
   const ss = SpreadsheetApp.getActive();
   const parts = [getMatchesSheet_().getDataRange().getDisplayValues()];
-  [PLACES_SHEET, TEAMS_SHEET, DIV_SHEET].forEach(n => { const sh = ss.getSheetByName(n); parts.push(sh ? sh.getDataRange().getDisplayValues() : []); });
+  [PLACES_SHEET, TEAMS_SHEET, DIV_SHEET, LINEUPS_SHEET].forEach(n => { const sh = ss.getSheetByName(n); parts.push(sh ? sh.getDataRange().getDisplayValues() : []); });
   const st = ss.getSheetByName(SETTINGS_SHEET);
   parts.push(st ? st.getDataRange().getDisplayValues().filter(r => !/password|pin|viewer code/i.test(r[0])) : []);
   return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(parts)));
@@ -355,7 +572,8 @@ function payload_(s) {
     teams: teams,
     places: readPlaces_(),
     placeList: readPlaceList_(),
-    teamInfo: readTeamInfo_(),
+    teamInfo: readTeamInfo_().map(t => ({ team: t.team, division: t.division, manager: t.manager, phone: t.phone, hasCode: !!t.code })),
+    lineupDocs: readLineupFlags_(),
     divisions: readDivisions_(),
     oppInfo: readOpponentInfo_(),
     matches: matches,
@@ -659,6 +877,7 @@ function guessDivision_(team) {
 function ensureTeamSheets_() {
   const ss = SpreadsheetApp.getActive();
   const needTeams = !ss.getSheetByName(TEAMS_SHEET), needDivs = !ss.getSheetByName(DIV_SHEET);
+  ensurePlayersSheet_();
   if (!needTeams && !needDivs) { addContactHeaders_(); fillDefaultManagers_(); return; }
   const matches = readMatches_();
   const ours = Array.from(new Set(matches.map(m => m.ourTeam).filter(Boolean))).sort();
@@ -692,7 +911,7 @@ function ensureTeamSheets_() {
 /** Older sheets: add the manager/phone header cells if they're missing (data untouched). */
 function addContactHeaders_() {
   const ss = SpreadsheetApp.getActive();
-  [[TEAMS_SHEET, [[3, 'Manager'], [4, 'Manager Phone']]], [DIV_SHEET, [[3, 'Team Manager'], [4, 'Manager Phone']]]].forEach(([n, cols]) => {
+  [[TEAMS_SHEET, [[3, 'Manager'], [4, 'Manager Phone'], [5, 'Captain Code'], [6, 'Section'], [7, 'Name on Score Sheet']]], [DIV_SHEET, [[3, 'Team Manager'], [4, 'Manager Phone']]]].forEach(([n, cols]) => {
     const sh = ss.getSheetByName(n);
     if (!sh) return;
     cols.forEach(([c, label]) => {
@@ -718,12 +937,22 @@ function fillDefaultManagers_() {
   });
 }
 
+function ensurePlayersSheet_() {
+  const ss = SpreadsheetApp.getActive();
+  if (ss.getSheetByName(PLAYERS_SHEET)) return;
+  const sh = ss.insertSheet(PLAYERS_SHEET);
+  sh.getRange(1, 1, 1, 3).setValues([['Team', 'Player', 'Gender (B/G)']]).setFontWeight('bold');
+  sh.getRange(1, 5).setValue('One row per player. Team must match the Teams tab exactly. Gender B or G (needed for mixed teams). Row order = default order.');
+  sh.setColumnWidth(1, 200); sh.setColumnWidth(2, 240); sh.setColumnWidth(3, 110); sh.setFrozenRows(1);
+}
+
 function readTeamInfo_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(TEAMS_SHEET);
   if (!sh) return [];
   return sh.getDataRange().getDisplayValues().slice(1)
     .map((r, i) => ({ team: String(r[0]).trim(), division: String(r[1]).trim(), manager: String(r[2] || '').trim(),
-                      phone: String(r[3] || '').trim(), row: i + 2 }))
+                      phone: String(r[3] || '').trim(), code: String(r[4] || '').trim(), section: String(r[5] || '').trim(),
+                      sheetName: String(r[6] || '').trim(), row: i + 2 }))
     .filter(t => t.team);
 }
 
@@ -797,8 +1026,9 @@ function addToDivision_(division, team) {
 }
 
 /** Add or edit one of our teams (manager, division). */
-function saveTeam(pin, original, team, division, manager, phone) {
+function saveTeam(pin, original, team, division, manager, phone, captainCode) {
   phone = cleanPhone_(phone);
+  captainCode = String(captainCode || '').trim().slice(0, 30);
   assertAdmin_(pin);
   team = String(team || '').trim().slice(0, 100);
   division = String(division || '').trim().slice(0, 100);
@@ -821,6 +1051,7 @@ function saveTeam(pin, original, team, division, manager, phone) {
     const row = existing ? existing.row : sh.getLastRow() + 1;
     sh.getRange(row, 4).setNumberFormat('@');                // keep leading 0 in phone numbers
     sh.getRange(row, 1, 1, 4).setValues([[existing ? existing.team : team, division, manager, phone]]);
+    if (captainCode) sh.getRange(row, 5).setNumberFormat('@').setValue(captainCode);
     addToDivision_(division, existing ? existing.team : team);
     SpreadsheetApp.flush();
   } finally {
@@ -970,6 +1201,9 @@ function getSettings_() {
     title: kv['app title'] || 'ACBC Juvenile League 2026-27',
     homeLocation: kv['home location'] || 'Celbridge',
     iconUrl: kv['icon url'] || '',
+    boysTemplate: kv['boys match sheet template'] || '',
+    mixedTemplate: kv['mixed match sheet template'] || '',
+    sheetsFolder: kv['match sheets folder'] || '',
     reportsUrl: /^https:\/\//i.test(kv['match reports url'] || '') ? kv['match reports url'] : '',
     weeklyEmailTo: list(kv['weekly email to']).filter(e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)),
     adminPins: list(kv['admin passwords'] || kv['admin pins']),

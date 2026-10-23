@@ -169,6 +169,18 @@
   .typeseg button.on.Home{background:var(--home);border-color:var(--home);color:#fff}
   .typeseg button.on.Away{background:var(--away);border-color:var(--away);color:#fff}
   .hint{font-size:12px;color:var(--muted);margin:8px 2px}
+  .dbtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .dbtns .editbtn{margin-top:0}
+  .lubtn{border:1.5px solid var(--accent);background:transparent;color:var(--accent);border-radius:7px;padding:5px 12px;font-size:13px;font-weight:700;cursor:pointer}
+  .lubtn .ok{color:var(--s-ok);font-weight:700}
+  .slot{display:grid;grid-template-columns:110px 1fr;gap:6px;align-items:center;margin-bottom:6px}
+  .slot .sl{font-size:12px;font-weight:700;color:var(--muted)}
+  .slot .pick{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .slot select{padding:7px;font-size:14px}
+  .luwarn{font-size:12.5px;color:var(--s-warn);margin-top:8px;line-height:1.5}
+  .ludone{display:none;margin-top:12px;padding:10px;border-radius:10px;background:color-mix(in srgb,var(--mint) 18%,var(--card));font-size:14px}
+  .ludone a{display:inline-block;margin:6px 8px 0 0;padding:8px 12px;border-radius:8px;font-weight:700;text-decoration:none}
+  .ludone .pdf{background:var(--navy);color:#fff} .ludone .gdoc{border:1.5px solid var(--accent);color:var(--accent)}
   .reports{display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px solid var(--accent);color:var(--accent);
     background:color-mix(in srgb,var(--mint) 10%,var(--card));border-radius:8px;padding:7px 10px;font-size:13px;font-weight:700;text-decoration:none}
   .reports span{font-weight:400}
@@ -375,12 +387,52 @@
       <div class="full"><label>Division (teams in the same division can be opponents)</label><input id="t_div" list="divDL" placeholder="e.g. U15 Mixed Div 2"></div>
       <div><label>Team manager</label><input id="t_mgr" placeholder="Manager's name" autocomplete="off"></div>
       <div><label>Manager phone</label><input id="t_phone" type="tel" inputmode="tel" placeholder="e.g. 087 123 4567" autocomplete="off"></div>
+      <div class="full"><label>Captain code (for line-ups &amp; match sheets)</label><input id="t_code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. smash15"></div>
     </div>
     <datalist id="divDL"></datalist>
     <div class="err" id="teamErr"></div>
     <div class="row">
       <button class="btn ghost" id="tCancel">Cancel</button>
       <button class="btn primary" id="tSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Captain code -->
+<div class="overlay" id="capOverlay">
+  <div class="sheet">
+    <h2>Captain code</h2>
+    <div class="hint" id="capTeam" style="margin-top:-6px"></div>
+    <input id="capInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label class="check"><input type="checkbox" id="capRemember" checked> Remember on this device</label>
+    <div class="err" id="capErr"></div>
+    <div class="row"><button class="btn ghost" id="capCancel">Cancel</button><button class="btn primary" id="capOk">Continue</button></div>
+  </div>
+</div>
+
+<!-- Line-up & match sheet -->
+<div class="overlay" id="luOverlay">
+  <div class="sheet">
+    <h2 id="luTitle">Line-up</h2>
+    <div class="hint" id="luSub" style="margin-top:-6px"></div>
+    <div class="fgrid">
+      <div><label>Age group</label><input id="lu_age"></div>
+      <div><label>Division</label><input id="lu_division"></div>
+      <div><label>Section</label><input id="lu_section" placeholder="if any"></div>
+      <div></div>
+      <div><label>Home team (on sheet)</label><input id="lu_homeName"></div>
+      <div><label>Away team (on sheet)</label><input id="lu_awayName"></div>
+    </div>
+    <h4 id="luSide">Our players</h4>
+    <div id="luSlots"></div>
+    <button type="button" class="lbtn" id="luAuto">↻ Fill doubles &amp; mixed pairs from the singles</button>
+    <div class="luwarn" id="luWarn"></div>
+    <div class="err" id="luErr"></div>
+    <div class="ludone" id="luDone"></div>
+    <div class="row">
+      <button class="btn ghost" id="luCancel">Close</button>
+      <button class="btn ghost" id="luSave">Save</button>
+      <button class="btn primary" id="luMake">Create match sheet</button>
     </div>
   </div>
 </div>
@@ -538,9 +590,138 @@ $('themeBtn').onclick = () => {
 };
 applyTheme(store.get('theme') || 'auto');
 
+// ---- line-ups & match sheets ----
+function mkey(m){ return [m.ourTeam, m.opponent, side(m) === 'home' ? 'H' : side(m) === 'away' ? 'A' : 'N'].join('|').toLowerCase(); }
+function lineupAuth(team){
+  if(state.pin) return { pin: state.pin };
+  const c = store.get('cap:' + team) || store.get('cap:' + team, true);
+  return c ? { code: c } : null;
+}
+function askCaptainCode(team){
+  return new Promise(resolve => {
+    $('capTeam').textContent = 'For ' + team + '. Ask the club admin if you don’t have it.';
+    $('capInput').value = ''; $('capErr').textContent = '';
+    $('capOverlay').classList.add('show'); setTimeout(() => $('capInput').focus(), 50);
+    $('capCancel').onclick = () => { $('capOverlay').classList.remove('show'); resolve(null); };
+    $('capOk').onclick = async () => {
+      const code = $('capInput').value.trim(); if(!code) return;
+      $('capErr').textContent = 'Checking…';
+      const ok = await call('verifyCaptain', team, code).catch(() => false);
+      if(!ok){ $('capErr').textContent = 'That code isn’t right for ' + team + '.'; return; }
+      store.set('cap:' + team, code, !$('capRemember').checked);
+      $('capOverlay').classList.remove('show'); resolve({ code });
+    };
+    $('capInput').onkeydown = e => { if(e.key === 'Enter') $('capOk').click(); };
+  });
+}
+async function openLineup(m){
+  if(!m) return;
+  let auth = lineupAuth(m.ourTeam) || await askCaptainCode(m.ourTeam);
+  if(!auth) return;
+  toast('Loading line-up…');
+  let d;
+  try{ d = await call('getLineupData', auth, m.row, m.fp); }
+  catch(e){
+    const msg = e.message || String(e);
+    if(/captain code/i.test(msg) && auth.code){ store.del('cap:' + m.ourTeam); store.del('cap:' + m.ourTeam, true); auth = await askCaptainCode(m.ourTeam); if(auth) return openLineup(m); return; }
+    toast(msg); return;
+  }
+  state.lu = { m, auth, d };
+  const home = d.home, src = d.saved || {};
+  $('luTitle').textContent = m.ourTeam + ' v ' + m.opponent;
+  $('luSub').textContent = (isISO(m.date) ? dayLabel(m.date) : (m.dateNote || 'Date TBC')) + (m.time ? ' · ' + m.time : '') + ' · ' + (home ? 'Home' : 'Away') + (m.place ? ' · ' + m.place : '');
+  ['age','division','section','homeName','awayName'].forEach(k => $('lu_'+k).value = (src[k] !== undefined && src[k] !== '' ? src[k] : d.defaults[k]) || '');
+  $('luSide').textContent = 'Our players – ' + (home ? 'Home (left) column' : 'Away (right) column') + (d.type === 'mixed' ? ' · Mixed sheet' : ' · Boys sheet');
+  renderSlots(d.saved ? d.saved.slots : defaultSlots(d));
+  $('luErr').textContent = ''; $('luDone').style.display = 'none';
+  if(d.saved && d.saved.docUrl) showDone(d.saved.docUrl);
+  $('luMake').disabled = !d.templateSet;
+  $('luMake').title = d.templateSet ? '' : 'The match-sheet template isn’t set up yet (Settings)';
+  if(!d.own.length) $('luErr').textContent = 'No players listed for ' + m.ourTeam + ' yet – add them in the Players tab of the sheet.';
+  $('luOverlay').classList.add('show');
+}
+function poolFor(d, g){
+  const fit = p => !p.gender || !g || p.gender === g;
+  return { own: d.own.filter(fit), others: d.others.filter(fit) };
+}
+function selectHTML(d, g, value){
+  const pool = poolFor(d, g);
+  const names = new Set([...pool.own, ...pool.others].map(p => p.name));
+  let h = '<option value="">—</option>';
+  if(value && !names.has(value)) h += '<option selected>'+esc(value)+'</option>';
+  h += '<optgroup label="'+esc(state.lu.m.ourTeam)+'">' + pool.own.map(p => '<option'+(p.name===value?' selected':'')+'>'+esc(p.name)+'</option>').join('') + '</optgroup>';
+  if(pool.others.length) h += '<optgroup label="Other club players (subs)">' + pool.others.map(p =>
+    '<option value="'+esc(p.name)+'"'+(p.name===value?' selected':'')+'>'+esc(p.name)+' · '+esc(shortTeam(p.team))+'</option>').join('') + '</optgroup>';
+  return h;
+}
+function renderSlots(slots){
+  const d = state.lu.d;
+  $('luSlots').innerHTML = d.slots.map((s, i) => '<div class="slot"><span class="sl">'+esc(s.label)+'</span><div class="pick">' +
+    Array.from({length: s.n}, (_, j) => '<select data-i="'+i+'" data-j="'+j+'">' + selectHTML(d, s.g === 'BG' ? (j === 0 ? 'B' : 'G') : s.g, ((slots||[])[i]||[])[j] || '') + '</select>').join('') +
+    '</div></div>').join('');
+  $('luSlots').querySelectorAll('select').forEach(el => el.onchange = checkLineup);
+  checkLineup();
+}
+function readSlots(){
+  const out = state.lu.d.slots.map(s => Array(s.n).fill(''));
+  $('luSlots').querySelectorAll('select').forEach(el => out[+el.dataset.i][+el.dataset.j] = el.value);
+  return out;
+}
+function defaultSlots(d){
+  const boys = d.own.filter(p => p.gender !== 'G').map(p => p.name), girls = d.own.filter(p => p.gender === 'G').map(p => p.name);
+  return d.type === 'mixed' ? pairsFrom('mixed', [[boys[0]],[girls[0]],[boys[1],boys[2]],[girls[1],girls[2]]]) : pairsFrom('boys', [[boys[0]],[boys[1]],[boys[2]],[boys[3]]]);
+}
+// Boys: doubles = S1+S2, S3+S4.  Mixed: boy n with girl n (singles player = 1, doubles players = 2 and 3)
+function pairsFrom(type, s){
+  const v = x => x || '';
+  if(type === 'boys') return [[v(s[0][0])],[v(s[1][0])],[v(s[2][0])],[v(s[3][0])],[v(s[0][0]),v(s[1][0])],[v(s[2][0]),v(s[3][0])]];
+  const b = [s[0][0], s[2][0], s[2][1]], g = [s[1][0], s[3][0], s[3][1]];
+  return [[v(b[0])],[v(g[0])],[v(b[1]),v(b[2])],[v(g[1]),v(g[2])],[v(b[0]),v(g[0])],[v(b[1]),v(g[1])],[v(b[2]),v(g[2])]];
+}
+$('luAuto').onclick = () => { renderSlots(pairsFrom(state.lu.d.type, readSlots())); toast('Pairs filled – change any you like'); };
+// League rules: every player plays two matches (mixed: one of them a mixed doubles)
+function checkLineup(){
+  const d = state.lu.d, slots = readSlots(), count = {}, mixed = {}, warn = [];
+  slots.forEach((names, i) => {
+    const filled = names.filter(Boolean);
+    if(new Set(filled).size < filled.length) warn.push(d.slots[i].label + ': same player twice');
+    filled.forEach(n => { count[n] = (count[n]||0) + 1; if(d.slots[i].g === 'BG') mixed[n] = 1; });
+  });
+  Object.keys(count).forEach(n => {
+    if(count[n] !== 2) warn.push(n + ' plays ' + count[n] + ' match' + (count[n]===1?'':'es') + ' (should be 2)');
+    else if(d.type === 'mixed' && !mixed[n]) warn.push(n + ' has no mixed doubles');
+  });
+  const empty = slots.reduce((a, s) => a + s.filter(x => !x).length, 0);
+  if(empty) warn.push(empty + ' empty place' + (empty===1?'':'s') + ' – they’ll be left blank on the sheet');
+  $('luWarn').innerHTML = warn.length ? '⚠ ' + warn.map(esc).join('<br>⚠ ') : '<span style="color:var(--s-ok)">✓ Everyone plays two matches</span>';
+}
+function luForm(){ const f = { slots: readSlots() }; ['age','division','section','homeName','awayName'].forEach(k => f[k] = $('lu_'+k).value.trim()); return f; }
+function showDone(docUrl, pdfUrl){
+  const id = (docUrl.match(/[-\w]{25,}/)||[''])[0];
+  pdfUrl = pdfUrl || (id ? 'https://docs.google.com/document/d/'+id+'/export?format=pdf' : '');
+  $('luDone').innerHTML = '✓ Match sheet ready<br><a class="pdf" target="_blank" rel="noopener" href="'+esc(pdfUrl)+'">🖨 Open PDF to print</a>' +
+    '<a class="gdoc" target="_blank" rel="noopener" href="'+esc(docUrl)+'">Open in Google Docs</a>';
+  $('luDone').style.display = 'block';
+}
+async function luSubmit(makeDoc){
+  const { m, auth } = state.lu;
+  const btn = makeDoc ? $('luMake') : $('luSave');
+  btn.disabled = true; $('luErr').textContent = makeDoc ? 'Creating the match sheet… (about 10 seconds)' : 'Saving…';
+  try{
+    const r = await call('saveLineup', auth, m.row, m.fp, luForm(), makeDoc);
+    state.data = r.data; $('luErr').textContent = '';
+    if(makeDoc && r.docUrl) showDone(r.docUrl, r.pdfUrl); else toast('Line-up saved');
+    render();
+  }catch(e){ $('luErr').textContent = e.message || e; }
+  btn.disabled = makeDoc ? !state.lu.d.templateSet : false;
+}
+$('luSave').onclick = () => luSubmit(false);
+$('luMake').onclick = () => luSubmit(true);
+$('luCancel').onclick = () => $('luOverlay').classList.remove('show');
+
 // ---- update checks: every 30 min, and when the app comes back to the foreground ----
 const CHECK_EVERY = 30 * 60 * 1000, MIN_GAP = 2 * 60 * 1000;
-function busy(){ return ['formOverlay','placeOverlay','teamOverlay','pinOverlay','oppOverlay'].some(id => $(id).classList.contains('show')); }
+function busy(){ return ['formOverlay','placeOverlay','teamOverlay','pinOverlay','oppOverlay','capOverlay','luOverlay'].some(id => $(id).classList.contains('show')); }
 function showUpdate(msg, label, onGo){
   $('updMsg').textContent = msg; $('updGo').textContent = label;
   $('updGo').onclick = e => { if(onGo){ e.preventDefault(); onGo(); } };
@@ -668,7 +849,9 @@ function rowHTML(m){
     '<div>'+(state.team ? '' : '<b>'+esc(m.ourTeam)+'</b> · ')+'Status: '+esc(m.status||'—')+'</div>'+
     (loc ? '<div>'+loc+'</div>' : '')+
     (state.data.reportsUrl ? '<div><a target="_blank" rel="noopener" href="'+esc(state.data.reportsUrl)+'">📝 Match report / scoring sheet ↗</a></div>' : '')+
-    (state.pin ? '<button class="editbtn" data-edit="'+m.row+'">Edit match</button>' : '');
+    '<div class="dbtns">'+
+      '<button class="lubtn" data-lineup="'+m.row+'">📝 Line-up &amp; match sheet'+((state.data.lineupDocs||{})[mkey(m)] === 'doc' ? ' <span class="ok">✓ ready</span>' : '')+'</button>'+
+      (state.pin ? '<button class="editbtn" data-edit="'+m.row+'">Edit match</button>' : '')+'</div>';
 
   return '<div class="m '+s+(conf?'':' tbc')+(isCancelled(m)?' cancel':'')+(state.open[m.row]?' open':'')+'" data-row="'+m.row+'">'+
     '<div class="r1"><span class="dt'+(m.date===today?' today':'')+'">'+esc(date)+'</span>'+
@@ -692,6 +875,8 @@ function wireRows(root){
   if(first && seen < 3 && !state.hinted){ first.classList.add('hint'); state.hinted = true; store.set('tapHintSeen', String(seen + 1)); }
   root.querySelectorAll('.m').forEach(el => el.onclick = e => {
     if(e.target.closest('a')) return;
+    const lb = e.target.closest('[data-lineup]');
+    if(lb){ openLineup(state.data.matches.find(m => String(m.row) === lb.dataset.lineup)); return; }
     const eb = e.target.closest('[data-edit]');
     if(eb){ openForm(state.data.matches.find(m => String(m.row) === eb.dataset.edit)); return; }
     el.classList.toggle('open');
@@ -879,7 +1064,8 @@ function renderTeamsAdmin(){
     const others = (divs[d] || []).filter(t => !ours.has(t.toLowerCase()) && !ourHere.some(o => o.team.toLowerCase() === t.toLowerCase()));
     html += '<div class="div"><h3>'+esc(d)+'</h3>' +
       ourHere.map(t => '<div class="ours" data-team="'+esc(t.team)+'"><span class="nm">'+esc(t.team)+'</span>'+
-        '<span class="mg'+(t.manager?'':' missing')+'">'+(t.manager ? '👤 '+esc(t.manager)+(t.phone ? ' · 📞' : '') : 'Add manager')+'</span></div>').join('') +
+        '<span class="mg'+(t.manager?'':' missing')+'">'+(t.manager ? '👤 '+esc(t.manager)+(t.phone ? ' · 📞' : '') : 'Add manager')+
+        ((state.data.teamInfo||[]).some(x => x.team === t.team && x.hasCode) ? ' · 🔑' : '')+'</span></div>').join('') +
       '<div class="opps">' + others.map(o => {
         const c = (state.data.oppInfo||[]).find(x => x.division === d && x.team.toLowerCase() === o.toLowerCase());
         const used = fixturesIn(d, o);
@@ -917,6 +1103,8 @@ function openTeam(team){
   $('t_div').value = t ? t.division : '';
   $('t_mgr').value = t ? t.manager : '';
   $('t_phone').value = t ? (t.phone || '') : '';
+  const ti = t ? (state.data.teamInfo||[]).find(x => x.team === t.team) : null;
+  $('t_code').value = ''; $('t_code').placeholder = ti && ti.hasCode ? 'Set ✓ – type a new code to change it' : 'e.g. smash15';
   const divNames = [...new Set([...Object.keys(state.data.divisions||{}), ...(state.data.teamInfo||[]).map(x => x.division)].filter(Boolean))].sort();
   $('divDL').innerHTML = divNames.map(d => '<option value="'+esc(d)+'">').join('');
   $('teamErr').textContent = '';
@@ -949,7 +1137,7 @@ $('tSave').onclick = async () => {
   const t = state.editTeam;
   $('tSave').disabled = true; $('teamErr').textContent = 'Saving…';
   try{
-    state.data = await call('saveTeam', state.pin, t ? t.team : '', $('t_name').value.trim(), $('t_div').value.trim(), $('t_mgr').value.trim(), $('t_phone').value.trim());
+    state.data = await call('saveTeam', state.pin, t ? t.team : '', $('t_name').value.trim(), $('t_div').value.trim(), $('t_mgr').value.trim(), $('t_phone').value.trim(), $('t_code').value.trim());
     $('teamOverlay').classList.remove('show'); renderChips(); render(); toast('Team saved');
   }catch(err){ $('teamErr').textContent = err.message || err; }
   $('tSave').disabled = false;
@@ -1207,7 +1395,7 @@ document.querySelectorAll('#mode button').forEach(b => b.onclick = () => {
 });
 $('search').oninput = e => { state.q = e.target.value; if(state.data) render(); };
 $('refreshBtn').onclick = () => load();
-[$('pinOverlay'), $('formOverlay'), $('placeOverlay'), $('teamOverlay'), $('oppOverlay')].forEach(o => o.addEventListener('click', e => { if(e.target === o) o.classList.remove('show'); }));
+[$('pinOverlay'), $('formOverlay'), $('placeOverlay'), $('teamOverlay'), $('oppOverlay'), $('capOverlay')].forEach(o => o.addEventListener('click', e => { if(e.target === o) o.classList.remove('show'); }));
 
 state.team = store.get('myTeam');
 if(store.get('viewMode') === 'cal'){ state.mode = 'cal'; document.querySelectorAll('#mode button').forEach(x => x.classList.toggle('on', x.dataset.mode==='cal')); }
