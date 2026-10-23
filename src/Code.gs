@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.24.0';
+const APP_VERSION = '1.25.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -174,20 +174,18 @@ function matchKey_(m) { return [m.ourTeam, m.opponent, /^home/i.test(m.venue) ? 
 function sheetType_(team, division) { return /mixed/i.test(team + ' ' + (division || '')) ? 'mixed' : 'boys'; }
 function docIdFrom_(url) { return (String(url || '').match(/[-\w]{25,}/) || [''])[0]; }
 
-/** A captain code for that team, or an admin password. Never says which part was wrong. */
+/**
+ * Line-ups are open to anyone who can see the app (no captain codes). If Settings has a Viewer Code,
+ * the same code is required here as for the fixtures; admins always pass.
+ */
 function authorizeTeam_(auth, team) {
   auth = auth || {};
-  const pins = getSettings_().adminPins;
-  if (auth.pin && pins.indexOf(String(auth.pin).trim()) >= 0) return 'admin';
-  const t = readTeamInfo_().find(x => x.team.toLowerCase() === String(team || '').toLowerCase());
-  if (t && t.code && auth.code && String(auth.code).trim().toLowerCase() === t.code.toLowerCase()) return 'captain';
-  Utilities.sleep(1200);
-  throw new Error('Captain code not recognised for ' + team + '.');
+  const s = getSettings_();
+  if (auth.pin && s.adminPins.indexOf(String(auth.pin).trim()) >= 0) return 'admin';
+  if (s.viewerCode && String(auth.viewer || '').trim() !== s.viewerCode) throw new Error('Access code needed – reload the app.');
+  return 'captain';
 }
 
-function verifyCaptain(team, code) {
-  try { authorizeTeam_({ code: code }, team); return true; } catch (e) { return false; }
-}
 
 /** "U15 Mixed Team Div 2", "U15 Mixed Div 2" and "u15-mixed-div2" all compare equal; so do "U17 Div 6" and "U17 Boys Div 6". */
 function normTeam_(t) { return String(t || '').toLowerCase().replace(/\b(team|boys)\b/g, '').replace(/[^a-z0-9]/g, ''); }
@@ -408,10 +406,10 @@ function sheetValues_(m, type, f, slots) {
   return v;
 }
 
-/** Menu: players per team and captain codes. */
+/** Menu: players per team. */
 function checkMatchSheetSetup() {
   const msgs = ['✓ Score-sheet templates are built in (Word download)'];
-  const pl = readPlayers_(), players = pl.length, codes = readTeamInfo_().filter(t => t.code).length;
+  const pl = readPlayers_(), players = pl.length;
   msgs.push((players ? '✓ ' : '⚠ ') + players + ' players in the Players tab');
   ourTeamNames_().sort().forEach(t => {
     const exact = pl.filter(p => normTeam_(p.team) === normTeam_(t)).length, any = playersOfTeam_(t, pl);
@@ -419,7 +417,6 @@ function checkMatchSheetSetup() {
   });
   const unmatched = Array.from(new Set(pl.filter(p => !resolveTeam_(p.team, ourTeamNames_())).map(p => p.team)));
   if (unmatched.length) msgs.push('⚠ Team names in Players not matching any team: ' + unmatched.join(', '));
-  msgs.push((codes ? '✓ ' : '⚠ ') + codes + ' team(s) have a captain code (Admin → Teams & managers)');
   try { SpreadsheetApp.getUi().alert('Match sheets setup\n\n' + msgs.join('\n')); } catch (e) { console.log(msgs.join('\n')); }
 }
 

@@ -423,7 +423,6 @@
       <div class="full"><label>Division (teams in the same division can be opponents)</label><input id="t_div" list="divDL" placeholder="e.g. U15 Mixed Div 2"></div>
       <div><label>Team manager</label><input id="t_mgr" placeholder="Manager's name" autocomplete="off"></div>
       <div><label>Manager phone</label><input id="t_phone" type="tel" inputmode="tel" placeholder="e.g. 087 123 4567" autocomplete="off"></div>
-      <div class="full"><label>Captain code (for line-ups &amp; match sheets)</label><input id="t_code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. smash15"></div>
     </div>
     <datalist id="divDL"></datalist>
     <div class="err" id="teamErr"></div>
@@ -431,18 +430,6 @@
       <button class="btn ghost" id="tCancel">Cancel</button>
       <button class="btn primary" id="tSave">Save</button>
     </div>
-  </div>
-</div>
-
-<!-- Captain code -->
-<div class="overlay" id="capOverlay">
-  <div class="sheet">
-    <h2>Captain code</h2>
-    <div class="hint" id="capTeam" style="margin-top:-6px"></div>
-    <input id="capInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
-    <label class="check"><input type="checkbox" id="capRemember" checked> Remember on this device</label>
-    <div class="err" id="capErr"></div>
-    <div class="row"><button class="btn ghost" id="capCancel">Cancel</button><button class="btn primary" id="capOk">Continue</button></div>
   </div>
 </div>
 
@@ -632,30 +619,7 @@ applyTheme(store.get('theme') || 'auto');
 
 // ---- line-ups & match sheets ----
 function mkey(m){ return [m.ourTeam, m.opponent, side(m) === 'home' ? 'H' : side(m) === 'away' ? 'A' : 'N'].join('|').toLowerCase(); }
-function lineupAuth(team){
-  if(state.pin) return { pin: state.pin };
-  const c = store.get('cap:' + team) || store.get('cap:' + team, true);
-  return c ? { code: c } : null;
-}
-function askCaptainCode(team){
-  return new Promise(resolve => {
-    $('capTeam').textContent = 'For ' + team + '. Ask the club admin if you don’t have it.';
-    $('capInput').value = ''; $('capErr').textContent = '';
-    $('capOverlay').classList.add('show'); setTimeout(() => $('capInput').focus(), 50);
-    $('capCancel').onclick = () => { $('capOverlay').classList.remove('show'); resolve(null); };
-    $('capOk').onclick = async () => {
-      const code = $('capInput').value.trim(); if(!code || $('capOk').disabled) return;
-      $('capErr').textContent = ''; $('capOk').disabled = true;
-      $('capOk').innerHTML = '<span class="spin" aria-hidden="true"></span>Checking…';
-      const ok = await call('verifyCaptain', team, code).catch(() => false);
-      $('capOk').disabled = false; $('capOk').textContent = 'Continue';
-      if(!ok){ $('capErr').textContent = 'That code isn’t right for ' + team + '.'; return; }
-      store.set('cap:' + team, code, !$('capRemember').checked);
-      $('capOverlay').classList.remove('show'); resolve({ code });
-    };
-    $('capInput').onkeydown = e => { if(e.key === 'Enter') $('capOk').click(); };
-  });
-}
+function lineupAuth(){ return state.pin ? { pin: state.pin } : { viewer: store.get('viewerCode') }; }
 // Loading state for the line-up pop-up: header shows the match, body a spinner, buttons disabled
 function luLoading(m, on){
   if(on){
@@ -674,15 +638,13 @@ function luLoading(m, on){
 }
 async function openLineup(m){
   if(!m) return;
-  let auth = lineupAuth(m.ourTeam) || await askCaptainCode(m.ourTeam);
-  if(!auth) return;
+  const auth = lineupAuth();
   luLoading(m, true);                                   // pop-up opens straight away with "Loading… please wait"
   let d;
   try{ d = await call('getLineupData', auth, m.row, m.fp); }
   catch(e){
     luLoading(m, false); $('luOverlay').classList.remove('show');
     const msg = e.message || String(e);
-    if(/captain code/i.test(msg) && auth.code){ store.del('cap:' + m.ourTeam); store.del('cap:' + m.ourTeam, true); auth = await askCaptainCode(m.ourTeam); if(auth) return openLineup(m); return; }
     toast(msg); return;
   }
   luLoading(m, false);
@@ -856,7 +818,7 @@ $('luX').onclick = () => $('luOverlay').classList.remove('show');
 
 // ---- update checks: every 30 min, and when the app comes back to the foreground ----
 const CHECK_EVERY = 30 * 60 * 1000, MIN_GAP = 2 * 60 * 1000;
-function busy(){ return ['formOverlay','placeOverlay','teamOverlay','pinOverlay','oppOverlay','capOverlay','luOverlay'].some(id => $(id).classList.contains('show')); }
+function busy(){ return ['formOverlay','placeOverlay','teamOverlay','pinOverlay','oppOverlay','luOverlay'].some(id => $(id).classList.contains('show')); }
 function showUpdate(msg, label, onGo){
   $('updMsg').textContent = msg; $('updGo').textContent = label;
   $('updGo').classList.remove('busy'); $('updX').style.display = '';
@@ -1213,7 +1175,7 @@ function renderTeamsAdmin(){
     html += '<div class="div"><h3>'+esc(d)+'</h3>' +
       ourHere.map(t => '<div class="ours" data-team="'+esc(t.team)+'"><span class="nm">'+esc(t.team)+'</span>'+
         '<span class="mg'+(t.manager?'':' missing')+'">'+(t.manager ? '👤 '+esc(t.manager)+(t.phone ? ' · 📞' : '') : 'Add manager')+
-        ((state.data.teamInfo||[]).some(x => x.team === t.team && x.hasCode) ? ' · 🔑' : '')+'</span></div>').join('') +
+        '</span></div>').join('') +
       '<div class="opps">' + others.map(o => {
         const c = (state.data.oppInfo||[]).find(x => x.division === d && x.team.toLowerCase() === o.toLowerCase());
         const used = fixturesIn(d, o);
@@ -1251,8 +1213,7 @@ function openTeam(team){
   $('t_div').value = t ? t.division : '';
   $('t_mgr').value = t ? t.manager : '';
   $('t_phone').value = t ? (t.phone || '') : '';
-  const ti = t ? (state.data.teamInfo||[]).find(x => x.team === t.team) : null;
-  $('t_code').value = ''; $('t_code').placeholder = ti && ti.hasCode ? 'Set ✓ – type a new code to change it' : 'e.g. smash15';
+
   const divNames = [...new Set([...Object.keys(state.data.divisions||{}), ...(state.data.teamInfo||[]).map(x => x.division)].filter(Boolean))].sort();
   $('divDL').innerHTML = divNames.map(d => '<option value="'+esc(d)+'">').join('');
   $('teamErr').textContent = '';
@@ -1285,7 +1246,7 @@ $('tSave').onclick = async () => {
   const t = state.editTeam;
   $('tSave').disabled = true; $('teamErr').textContent = 'Saving…';
   try{
-    state.data = await call('saveTeam', state.pin, t ? t.team : '', $('t_name').value.trim(), $('t_div').value.trim(), $('t_mgr').value.trim(), $('t_phone').value.trim(), $('t_code').value.trim());
+    state.data = await call('saveTeam', state.pin, t ? t.team : '', $('t_name').value.trim(), $('t_div').value.trim(), $('t_mgr').value.trim(), $('t_phone').value.trim());
     $('teamOverlay').classList.remove('show'); renderChips(); render(); toast('Team saved');
   }catch(err){ $('teamErr').textContent = err.message || err; }
   $('tSave').disabled = false;
@@ -1543,7 +1504,7 @@ document.querySelectorAll('#mode button').forEach(b => b.onclick = () => {
 });
 $('search').oninput = e => { state.q = e.target.value; if(state.data) render(); };
 $('refreshBtn').onclick = () => load();
-[$('pinOverlay'), $('formOverlay'), $('placeOverlay'), $('teamOverlay'), $('oppOverlay'), $('capOverlay')].forEach(o => o.addEventListener('click', e => { if(e.target === o) o.classList.remove('show'); }));
+[$('pinOverlay'), $('formOverlay'), $('placeOverlay'), $('teamOverlay'), $('oppOverlay')].forEach(o => o.addEventListener('click', e => { if(e.target === o) o.classList.remove('show'); }));
 
 state.team = store.get('myTeam');
 if(store.get('viewMode') === 'cal'){ state.mode = 'cal'; document.querySelectorAll('#mode button').forEach(x => x.classList.toggle('on', x.dataset.mode==='cal')); }
