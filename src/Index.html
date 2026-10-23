@@ -236,6 +236,11 @@
     .wa{display:inline-flex;align-items:center;gap:3px;color:var(--wa);font-weight:700;text-decoration:none;white-space:nowrap}
 
   .wa svg{width:13px;height:13px;flex:0 0 auto}
+  .wadet{display:inline-flex;align-items:center;justify-content:center;margin-left:4px;min-width:22px;height:20px;padding:0 4px;border-radius:6px;
+    border:1.5px solid var(--wa);color:var(--wa);font-size:12px;font-weight:700;text-decoration:none;line-height:1;vertical-align:1px}
+  .sharebtn{display:inline-flex;align-items:center;gap:4px;margin-left:6px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);
+    border-radius:7px;padding:2px 8px;font-size:12px;font-weight:700;cursor:pointer;vertical-align:1px}
+  .sharebtn svg{width:13px;height:13px}
   .mgrs{display:flex;flex-wrap:nowrap;gap:12px;padding:0 8px 6px 10px;margin-top:-3px;font-size:11.5px;color:var(--muted);min-width:0}
   .mgrs > span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .mgrs > span:first-child{flex:0 0 auto;max-width:45%}
@@ -618,6 +623,7 @@ function waNumber(phone){
   if(d.startsWith('+')) d = d.slice(1); else if(d.startsWith('00')) d = d.slice(2); else if(d.startsWith('0')) d = '353' + d.slice(1);
   return d.length >= 8 ? d : '';
 }
+const SHARE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
 const WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3.9 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2.1.7 2.8.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>';
 // Hi Prashanth,
 // About U13 Boys Div 5: ACBC A1 vs ACE on Fri 13 Nov at 18:30, Celbridge.
@@ -633,25 +639,55 @@ function waText(name, m){
   }
   return 'Hi ' + (name || '') + ',\nAbout ' + div + ': ' + ourSheetName(m.ourTeam) + ' vs ' + oppSheetName(m.opponent) + when + '.';
 }
+// The venue of a match: name, address and map link (only when the place is known)
+function venueOf(m){
+  const pk = (m.place || '').toLowerCase();
+  if(!m.place || NO_MAP.indexOf(pk) >= 0) return null;
+  const p = (state.data.placeList || []).find(x => x.name.toLowerCase() === pk) || {};
+  return { name: m.place, address: p.address || '', map: mapsHref(m.place) };
+}
+// Lines added under a message: address and map link, when known
+function venueLines(m){
+  const v = venueOf(m); if(!v) return '';
+  return (v.address ? '\nVenue: ' + v.address : '') + (v.map ? '\nMap: ' + v.map : '');
+}
+// Approach 1: the name opens the chat empty; the ✉ icon opens it with the match details filled in
+function waChat(phone){ const n = waNumber(phone); return n ? 'https://wa.me/' + n : ''; }
 function waHref(phone, name, m){
   const n = waNumber(phone); if(!n) return '';
-  return 'https://wa.me/' + n + '?text=' + encodeURIComponent(waText(name, m));
+  return 'https://wa.me/' + n + '?text=' + encodeURIComponent(waText(name, m) + venueLines(m));
 }
 function waLink(phone, name, m, label){
-  const h = waHref(phone, name, m);
-  return h ? '<a class="wa" target="_blank" rel="noopener" href="'+esc(h)+'" title="WhatsApp '+esc(name||phone)+'">'+WA_ICON+esc(label)+'</a>' : '';
+  const chat = waChat(phone), det = waHref(phone, name, m);
+  if(!chat) return '';
+  return '<a class="wa" target="_blank" rel="noopener" href="'+esc(chat)+'" title="Open WhatsApp chat with '+esc(name||phone)+'">'+WA_ICON+esc(label)+'</a>'+
+    '<a class="wadet" target="_blank" rel="noopener" href="'+esc(det)+'" title="Send '+esc(name||'them')+' the match details" aria-label="Send match details on WhatsApp">✉</a>';
 }
 function contactLine(label, name, phone, m){
   if(!name && !phone) return '';
   return '<div>'+label+': <b>'+esc(name || '—')+'</b>'+(phone ? ' · '+waLink(phone, name, m, 'WhatsApp '+phone) : '')+'</div>';
 }
-// One short line per match: both managers, each a WhatsApp link when a phone is known
+// One short line per match: both managers; a name with a phone opens WhatsApp, ✉ sends the match details
 function managersLine(m){
   const t = teamInfo(m.ourTeam) || {}, o = oppContact(m.ourTeam, m.opponent) || {};
   const part = (who, name, phone) => (name || phone)
     ? '<span>'+who+' '+(phone && waNumber(phone) ? waLink(phone, name, m, name || phone) : '<b>'+esc(name)+'</b>')+'</span>' : '';
   const html = part('👤', t.manager, t.phone) + part('vs', o.manager, o.phone);
   return html ? '<div class="mgrs">'+html+'</div>' : '';
+}
+// Share the location (with the match) through the phone's share menu; fall back to copy, then WhatsApp
+async function shareLocation(m){
+  const v = venueOf(m); if(!v) return;
+  const t = findOurTeam(m.ourTeam);
+  const when = isISO(m.date) ? shortDate(m.date) + (m.time ? ' at ' + m.time : '') : (m.dateNote || 'Date TBC');
+  const text = (t ? t.division + ': ' : '') + ourSheetName(m.ourTeam) + ' vs ' + oppSheetName(m.opponent) + ' – ' + when +
+    '\n📍 ' + v.name + (v.address ? ' – ' + v.address : '') + (v.map ? '\n' + v.map : '');
+  if(navigator.share){
+    try{ await navigator.share({ title: v.name, text: text }); return; }
+    catch(e){ if(e && e.name === 'AbortError') return; }
+  }
+  try{ await navigator.clipboard.writeText(text); toast('Location copied – paste it anywhere'); return; } catch(e){}
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
 }
 // Exact pin if the location has a Google Maps link, otherwise a search for its address (or name)
 function mapsHref(place){
@@ -1028,7 +1064,8 @@ function rowHTML(m){
   let loc = '';
   if(NO_MAP.indexOf(pk) < 0 && m.place){
     const href = mapsHref(m.place);
-    loc = href ? '<a target="_blank" href="'+esc(href)+'">📍 '+esc(pl && pl.address ? pl.address : m.place)+' – open in Maps</a>'
+    loc = href ? '<a target="_blank" href="'+esc(href)+'">📍 '+esc(pl && pl.address ? pl.address : m.place)+' – open in Maps</a>'+
+                 ' <button type="button" class="sharebtn" data-share="'+m.row+'" title="Share this location" aria-label="Share location">'+SHARE_ICON+'Share</button>'
                : '📍 '+esc(m.place)+' · address TBC';
   }
   const details =
@@ -1060,6 +1097,8 @@ function wireRows(root){
   if(first && seen < 3 && !state.hinted){ first.classList.add('hint'); state.hinted = true; store.set('tapHintSeen', String(seen + 1)); }
   root.querySelectorAll('.m').forEach(el => el.onclick = e => {
     if(e.target.closest('a')) return;
+    const sb = e.target.closest('[data-share]');
+    if(sb){ shareLocation(state.data.matches.find(m => String(m.row) === sb.dataset.share)); return; }
     const lb = e.target.closest('[data-lineup]');
     if(lb){
       if(lb.disabled) return;

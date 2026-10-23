@@ -165,7 +165,12 @@ The app also understands common variants (`U17 Mixed Div 1 - Dev`, `U13 Boys Div
 **Fixtures App → Tidy team names** lists every rename and duplicate it would fix and only changes the sheet when you
 click **Yes** (managers/phones on removed duplicates are kept; saved line-ups follow the new names).
 
-WhatsApp messages: `Hi Prashanth,` / `About U13 Boys Div 5: ACBC A1 vs ACE on Fri 13 Nov at 18:30, Celbridge.`
+WhatsApp: tapping a manager's name opens an **empty chat**; the **✉** next to it opens the chat with the match details:
+`Hi Prashanth,` / `About U13 Boys Div 5: ACBC A1 vs ACE on Fri 13 Nov at 18:30, Celbridge.` / `Venue: <address>` / `Map: <link>`
+(venue lines only when the location has an address or map link). The Monday email works the same way.
+
+**Share location**: in a match's details, **Share** next to the 📍 address opens the phone's share menu with the match,
+venue address and map link (on a computer it copies the text instead).
 
 ## Line-ups & match sheets
 

@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.27.0';
+const APP_VERSION = '1.28.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -421,7 +421,10 @@ function waMessage_(m, name) {
     const missing = ['date', !m.time && 'time', !place && 'location'].filter(Boolean);
     when = ' – ' + missing.join(', ').replace(/, ([^,]*)$/, ' and $1') + ' TBC' + (place ? ', ' + place : '');
   }
-  return 'Hi ' + (name || '') + ',\nAbout ' + div + ': ' + ourSheetName_(m.ourTeam) + ' vs ' + oppSheetName_(m.opponent) + when + '.';
+  const p = place ? (readPlaceList_().find(x => x.name.toLowerCase() === place.toLowerCase()) || {}) : {};
+  const map = p.link || (p.address ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(p.address) : '');
+  return 'Hi ' + (name || '') + ',\nAbout ' + div + ': ' + ourSheetName_(m.ourTeam) + ' vs ' + oppSheetName_(m.opponent) + when + '.' +
+    (p.address ? '\nVenue: ' + p.address : '') + (map ? '\nMap: ' + map : '');
 }
 
 /* ---------------- Monday email ---------------- */
@@ -484,9 +487,10 @@ function buildWeeklyEmail_(monday) {
   const wa = (phone, name, m) => {
     let d = String(phone || '').replace(/[^0-9+]/g, '');
     if (d[0] === '+') d = d.slice(1); else if (d.slice(0, 2) === '00') d = d.slice(2); else if (d[0] === '0') d = '353' + d.slice(1);
-    if (d.length < 8) return esc(name || '');
+    if (phoneProblem_(phone) || d.length < 8) return esc(name || '');
     const txt = waMessage_(m, name);
-    return '<a href="https://wa.me/' + d + '?text=' + encodeURIComponent(txt) + '" style="color:#128c4a;font-weight:bold;text-decoration:none">' + esc(name || phone) + '</a>';
+    return '<a href="https://wa.me/' + d + '" style="color:#128c4a;font-weight:bold;text-decoration:none">' + esc(name || phone) + '</a>' +
+      ' <a href="https://wa.me/' + d + '?text=' + encodeURIComponent(txt) + '" title="Send match details" style="color:#128c4a;text-decoration:none;border:1px solid #128c4a;border-radius:4px;padding:0 4px;font-size:12px">✉</a>';
   };
   const mapLink = m => {
     const p = places[(m.place || '').toLowerCase()];
