@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.22.0';
+const APP_VERSION = '1.22.1';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -197,6 +197,18 @@ function normTeam_(t) { return String(t || '').toLowerCase().replace(/\b(team|bo
 function ourTeamNames_() {
   return Array.from(new Set(readTeamInfo_().map(t => t.team).concat(readMatches_().map(m => m.ourTeam)).filter(Boolean)));
 }
+/**
+ * The players of one of our teams. Exact (loose) name match first; if none, fall back to the same team without a
+ * trailing " - X" suffix (so "U17 Mixed Div 1 - Dev" uses the "U17 Mixed Div 1" players).
+ */
+function playersOfTeam_(team, players) {
+  players = players || readPlayers_();
+  const exact = players.filter(p => normTeam_(p.team) === normTeam_(team));
+  if (exact.length) return exact;
+  const strip = t => String(t || '').replace(/\s+-\s+[^-]+$/, '');   // drop any trailing " - Dev" / " - A1"
+  const base = normTeam_(strip(team));
+  return players.filter(p => normTeam_(p.team) === base || normTeam_(strip(p.team)) === base);
+}
 function resolveTeam_(name, teams) { const n = normTeam_(name); return n ? (teams.find(t => normTeam_(t) === n) || '') : ''; }
 
 /**
@@ -300,7 +312,7 @@ function getLineupData(auth, row, fp) {
   const type = sheetType_(m.ourTeam, t.division);
   const saved = readLineups_().find(l => l.key === matchKey_(m)) || null;
   const players = readPlayers_();
-  const own = players.filter(p => normTeam_(p.team) === normTeam_(m.ourTeam)).map(p => ({ name: p.name, gender: p.gender, sub: p.sub }));
+  const own = playersOfTeam_(m.ourTeam, players).map(p => ({ name: p.name, gender: p.gender, sub: p.sub }));
   return { who: who, type: type, slots: SHEET_SLOTS[type], own: own, others: [],     // only this team's players
            saved: saved, defaults: lineupDefaults_(m), home: /^home/i.test(m.venue),
            templateSet: !!docIdFrom_(type === 'mixed' ? getSettings_().mixedTemplate : getSettings_().boysTemplate) };
@@ -407,7 +419,10 @@ function checkMatchSheetSetup() {
   try { msgs.push('✓ Folder: ' + matchSheetsFolder_().getName()); } catch (e) { msgs.push('✗ Folder: ' + e.message); }
   const pl = readPlayers_(), players = pl.length, codes = readTeamInfo_().filter(t => t.code).length;
   msgs.push((players ? '✓ ' : '⚠ ') + players + ' players in the Players tab');
-  ourTeamNames_().sort().forEach(t => { const n = pl.filter(p => normTeam_(p.team) === normTeam_(t)).length; msgs.push('   ' + (n ? '✓ ' : '⚠ ') + t + ': ' + n); });
+  ourTeamNames_().sort().forEach(t => {
+    const exact = pl.filter(p => normTeam_(p.team) === normTeam_(t)).length, any = playersOfTeam_(t, pl);
+    msgs.push('   ' + (any.length ? '✓ ' : '⚠ ') + t + ': ' + any.length + (!exact && any.length ? ' (using ' + any[0].team + ')' : ''));
+  });
   const unmatched = Array.from(new Set(pl.filter(p => !resolveTeam_(p.team, ourTeamNames_())).map(p => p.team)));
   if (unmatched.length) msgs.push('⚠ Team names in Players not matching any team: ' + unmatched.join(', '));
   msgs.push((codes ? '✓ ' : '⚠ ') + codes + ' team(s) have a captain code (Admin → Teams & managers)');
@@ -1031,7 +1046,9 @@ function ensurePlayersSheet_() {
 /** New names typed by a captain are added to that team's list (gender from the slot they were picked for). */
 function addNewPlayers_(team, defs, slots) {
   const players = readPlayers_();
-  const known = new Set(players.filter(p => normTeam_(p.team) === normTeam_(team)).map(p => p.name.toLowerCase()));
+  const mine = playersOfTeam_(team, players);
+  if (mine.length) team = mine[0].team;                       // e.g. "U17 Mixed Div 1 - Dev" → its players' team
+  const known = new Set(mine.map(p => p.name.toLowerCase()));
   const sh = SpreadsheetApp.getActive().getSheetByName(PLAYERS_SHEET);
   if (!sh) return;
   const wide = sh.getLastRow() >= 1 && !sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getDisplayValues()[0].some(h => /^player/i.test(String(h).trim()));
