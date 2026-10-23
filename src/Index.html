@@ -535,13 +535,24 @@ function shortTeam(t){
   const s = sfx ? u+sfx : u+g+dv;                    // "U15M2", "U13A1"
   return s.length > 2 ? s : t.slice(0,6);
 }
-function teamInfo(team){ return (state.data.teamInfo || []).find(t => t.team === team) || null; }
+// Team names are matched loosely: "U15 Mixed Team Div 2" = "U15 Mixed Div 2", and a trailing " - X"
+// (manager name, division…) is ignored if there's no exact match: "U17 Mixed Div 1 - Dev" → "U17 Mixed Div 1".
+const normTeam = t => String(t || '').toLowerCase().replace(/\b(team|boys)\b/g, '').replace(/[^a-z0-9]/g, '');
+const stripSuffix = t => String(t || '').replace(/\s+-\s+[^-]+$/, '');
+function looseFind(list, name, key){
+  const n = normTeam(name), b = normTeam(stripSuffix(name));
+  return list.find(x => x[key] === name) || list.find(x => normTeam(x[key]) === n) ||
+         list.find(x => normTeam(stripSuffix(x[key])) === b) || null;
+}
+function teamInfo(team){ return looseFind(state.data.teamInfo || [], team, 'team'); }
 function divisionOf(team){ const t = teamInfo(team); return t ? t.division : ''; }
 function managerOf(team){ const t = teamInfo(team); return t ? t.manager : ''; }
 // Opponent contact: only from the same division (e.g. "Kerela 1" in U15 and in U17 are different teams)
 function oppContact(ourTeam, opponent){
-  const list = state.data.oppInfo || [], k = (opponent||'').toLowerCase(), d = divisionOf(ourTeam);
-  return d ? (list.find(o => o.team.toLowerCase() === k && o.division === d) || null) : null;
+  const d = divisionOf(ourTeam);
+  if(!d) return null;
+  const inDiv = (state.data.oppInfo || []).filter(o => normTeam(o.division) === normTeam(d));
+  return looseFind(inDiv, opponent, 'team');
 }
 // WhatsApp: Irish numbers like "087 123 4567" become 353871234567; "+353…"/"00353…" are kept as international
 function waNumber(phone){
