@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.23.0';
+const APP_VERSION = '1.23.1';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -282,17 +282,39 @@ function readLineupFlags_() {
   return out;
 }
 
+/**
+ * Team names as printed on the score sheet.
+ *  ours: the club name, plus a team code like A1/A2 (needed when two club teams share a division) –
+ *        but not a manager's name ("U17 Mixed Div 1 - Dev" → "ACBC").
+ *  theirs: the opponent without anything after " - " ("Dunboyne - U17 Mixed Div 1" → "Dunboyne").
+ */
+function ourSheetName_(team) {
+  const suffix = (String(team).match(/\s+-\s+(.+?)\s*$/) || [])[1] || '';
+  return getSettings_().clubName + (/^[A-Z]?\d+$/i.test(suffix) ? ' ' + suffix : '');
+}
+function oppSheetName_(opponent) {
+  const m = String(opponent || '').trim().match(/^(.*?)\s+-\s+(.+)$/);
+  if (!m) return String(opponent || '').trim();
+  return /^[A-Z]?\d+$/i.test(m[2].trim()) ? m[1] + ' ' + m[2].trim() : m[1];   // keep team codes like "ACBC - A2"
+}
+/** Clean a home/away name from an older line-up or form ("ACBC Dev" → "ACBC", "X - U17 Mixed Div 1" → "X"). */
+function cleanSheetName_(name, isOurs, team) {
+  name = String(name || '').trim();
+  if (!isOurs) return oppSheetName_(name);
+  const club = getSettings_().clubName;
+  if (name.toLowerCase().indexOf(club.toLowerCase()) === 0) return ourSheetName_(team);
+  return name;
+}
+
 function lineupDefaults_(m) {
-  const s = getSettings_();
   const t = readTeamInfo_().find(x => x.team.toLowerCase() === m.ourTeam.toLowerCase()) || {};
   const division = t.division || guessDivision_(m.ourTeam);
   const age = (m.ourTeam.match(/U\s?\d+/i) || [''])[0].replace(/\s/g, '').toUpperCase();
   const divNo = (division.match(/div\w*\s*(\d+)/i) || [])[1];
-  const suffix = (m.ourTeam.match(/-\s*(\w+)\s*$/) || [])[1];
-  const ours = t.sheetName || (s.clubName + (suffix ? ' ' + suffix : ''));
+  const ours = ourSheetName_(m.ourTeam), theirs = oppSheetName_(m.opponent);
   const home = /^home/i.test(m.venue);
   return { age: age, division: divNo ? 'Div ' + divNo : division.replace(/^U\s?\d+\s*/i, ''), section: t.section || '',
-           homeName: home ? ours : m.opponent, awayName: home ? m.opponent : ours };
+           homeName: home ? ours : theirs, awayName: home ? theirs : ours };
 }
 
 function findMatchByRow_(row, fp) {
@@ -308,6 +330,11 @@ function getLineupData(auth, row, fp) {
   const t = readTeamInfo_().find(x => x.team.toLowerCase() === m.ourTeam.toLowerCase()) || {};
   const type = sheetType_(m.ourTeam, t.division);
   const saved = readLineups_().find(l => l.key === matchKey_(m)) || null;
+  if (saved) {                                               // tidy names saved by earlier versions
+    const home = /^home/i.test(m.venue);
+    saved.homeName = cleanSheetName_(saved.homeName, home, m.ourTeam);
+    saved.awayName = cleanSheetName_(saved.awayName, !home, m.ourTeam);
+  }
   const players = readPlayers_();
   const own = playersOfTeam_(m.ourTeam, players).map(p => ({ name: p.name, gender: p.gender, sub: p.sub }));
   return { who: who, type: type, slots: SHEET_SLOTS[type], own: own, others: [],     // only this team's players
@@ -368,7 +395,9 @@ function saveLineup(auth, row, fp, form, makeDoc) {
 /** Values for the template's {{placeholders}}. Our players go on the home (H) or away (A) side. */
 function sheetValues_(m, type, f, slots) {
   const tz = Session.getScriptTimeZone();
-  const v = { AGE: f.age, DIVISION: f.division, SECTION: f.section, HOME_TEAM: f.homeName, AWAY_TEAM: f.awayName,
+  const home = /^home/i.test(m.venue);
+  const v = { AGE: f.age, DIVISION: f.division, SECTION: f.section,
+              HOME_TEAM: cleanSheetName_(f.homeName, home, m.ourTeam), AWAY_TEAM: cleanSheetName_(f.awayName, !home, m.ourTeam),
               LOCATION: m.place && !/^internal$/i.test(m.place) ? m.place : (m.place || 'TBC'),
               DATE: m.date ? Utilities.formatDate(toDate_(m.date), tz, 'EEE d MMM yyyy') + (m.time ? ', ' + m.time : '') : (m.dateNote || '') };
   const side = /^home/i.test(m.venue) ? 'H' : 'A', other = side === 'H' ? 'A' : 'H';
