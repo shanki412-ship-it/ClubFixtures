@@ -146,6 +146,12 @@ teams with fixtures show their match count instead, and the server refuses the r
 - The footer shows the version, e.g. `v1.8.0 · 21 Oct 2026 · 65d2fe6`. The date and commit are stamped
   automatically by each deploy; bump `APP_VERSION` in `src/Code.gs` for bigger releases.
 
+## Match reports link
+
+**Settings → Match Reports URL** (default: the Dublin Juvenile League match-reports page) appears as a
+**📝 Match reports & scoring sheets** button on the Fixtures tab, in each match's details, and in the Monday email.
+Change or clear it in Settings; it must start with https://.
+
 ## Monday fixtures email
 
 Every Monday around 7–8am (Dublin time) the app emails that week's matches (Monday–Sunday): grouped by day,

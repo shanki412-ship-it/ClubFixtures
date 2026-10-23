@@ -169,6 +169,9 @@
   .typeseg button.on.Home{background:var(--home);border-color:var(--home);color:#fff}
   .typeseg button.on.Away{background:var(--away);border-color:var(--away);color:#fff}
   .hint{font-size:12px;color:var(--muted);margin:8px 2px}
+  .reports{display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px solid var(--accent);color:var(--accent);
+    background:color-mix(in srgb,var(--mint) 10%,var(--card));border-radius:8px;padding:7px 10px;font-size:13px;font-weight:700;text-decoration:none}
+  .reports span{font-weight:400}
   .teaminfo{font-size:12px;color:var(--muted);padding:0 4px}
   .teaminfo b{color:var(--ink)}
   .aseg{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:3px;margin-top:8px}
@@ -263,6 +266,7 @@
     <span class="caret">▼</span>
   </div>
   <div class="teaminfo" id="teamInfo"></div>
+  <a class="reports" id="reportsLink" target="_blank" rel="noopener" style="display:none">📝 Match reports &amp; scoring sheets <span>↗</span></a>
   <div class="bar2" id="listControls">
     <input class="search" id="search" type="search" placeholder="Search…">
     <div class="seg" id="mode">
@@ -510,6 +514,7 @@ async function load(silent){
     document.title = r.title || r.clubName;
     $('footTitle').textContent = r.title || r.clubName;
     $('ver').textContent = 'v' + (state.codeVersion || '');
+    if(r.reportsUrl){ $('reportsLink').href = r.reportsUrl; }
     if(state.team && r.teams.indexOf(state.team) < 0) state.team = '';
     updateSub(); renderChips(); render();
   }catch(e){
@@ -629,6 +634,7 @@ function render(){
   $('listControls').style.display = fixtures ? '' : 'none';
   $('legend').style.display = fixtures ? '' : 'none';
   $('teamWrap').style.display = v === 'places' ? 'none' : '';
+  $('reportsLink').style.display = v === 'fixtures' && state.data.reportsUrl ? '' : 'none';
   if(v === 'places') $('teamInfo').style.display = 'none'; else renderChips();
   $('fab').textContent = v !== 'places' ? '+ Add match' : state.adminSec === 'teams' ? '+ Add our team' : '+ Add location';
   if(v === 'stats') return renderStats();
@@ -661,6 +667,7 @@ function rowHTML(m){
   const details =
     '<div>'+(state.team ? '' : '<b>'+esc(m.ourTeam)+'</b> · ')+'Status: '+esc(m.status||'—')+'</div>'+
     (loc ? '<div>'+loc+'</div>' : '')+
+    (state.data.reportsUrl ? '<div><a target="_blank" rel="noopener" href="'+esc(state.data.reportsUrl)+'">📝 Match report / scoring sheet ↗</a></div>' : '')+
     (state.pin ? '<button class="editbtn" data-edit="'+m.row+'">Edit match</button>' : '');
 
   return '<div class="m '+s+(conf?'':' tbc')+(isCancelled(m)?' cancel':'')+(state.open[m.row]?' open':'')+'" data-row="'+m.row+'">'+

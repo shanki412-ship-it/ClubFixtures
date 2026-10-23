@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.18.0';
+const APP_VERSION = '1.19.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -44,6 +44,7 @@ const DEFAULT_SETTINGS = [
   ['Viewer Code', '', 'Optional code managers enter once to view. Blank = anyone with the link'],
   ['Icon URL', '', 'Browser-tab icon: upload acbc-icon-512.png to Google Drive, share "Anyone with the link", paste the link here'],
   ['Home Location', 'Celbridge', 'Location used for home matches that have no location filled in'],
+  ['Match Reports URL', 'https://sites.google.com/view/dubjuvleague/match-reports', 'League page with the match scoring sheets (shown in the app and the Monday email)'],
   ['Weekly Email To', '', 'Who gets the Monday fixtures email: email addresses separated by commas'],
   ['Statuses', 'Not Scheduled, Scheduled, Confirmed, Postponed, Cancelled, Played', 'Options in the status dropdown']
 ];
@@ -232,10 +233,11 @@ function buildWeeklyEmail_(monday) {
       '</td></tr>' + rows +
     '<tr><td colspan="3" style="padding:16px 4px;font:12px Arial,sans-serif;color:#5b6478;text-align:center">' +
       (appUrl ? '<a href="' + esc(appUrl) + '" style="display:inline-block;background:#7fd8b6;color:#1b2140;font:bold 14px Arial,sans-serif;padding:10px 18px;border-radius:8px;text-decoration:none">Open the fixtures app</a><br><br>' : '') +
+      (s.reportsUrl ? '<a href="' + esc(s.reportsUrl) + '" style="color:#0f7a5c;font:bold 13px Arial,sans-serif">📝 Match reports &amp; scoring sheets</a><br><br>' : '') +
       'Blue = home · Orange = away · Dashed = not confirmed yet<br>Sent every Monday by the ' + esc(s.clubName) + ' fixtures app · v' + esc(appVersion_()) + '</td></tr>' +
     '</table></div>';
   return { subject: s.clubName + ' fixtures ' + range + ' (' + (week.length ? week.length + ' match' + (week.length === 1 ? '' : 'es') : 'no matches') + ')',
-           html: html, text: text + (appUrl ? '\nApp: ' + appUrl + '\n' : ''), count: week.length };
+           html: html, text: text + (appUrl ? '\nApp: ' + appUrl + '\n' : '') + (s.reportsUrl ? 'Match reports: ' + s.reportsUrl + '\n' : ''), count: week.length };
 }
 
 /* ---------------- Public (client-callable) ---------------- */
@@ -345,6 +347,7 @@ function payload_(s) {
     clubName: s.clubName,
     title: s.title,
     homeLocation: s.homeLocation,
+    reportsUrl: s.reportsUrl,
     version: appVersion_(),
     stamp: dataStamp_(),
     appUrl: ScriptApp.getService().getUrl(),
@@ -967,6 +970,7 @@ function getSettings_() {
     title: kv['app title'] || 'ACBC Juvenile League 2026-27',
     homeLocation: kv['home location'] || 'Celbridge',
     iconUrl: kv['icon url'] || '',
+    reportsUrl: /^https:\/\//i.test(kv['match reports url'] || '') ? kv['match reports url'] : '',
     weeklyEmailTo: list(kv['weekly email to']).filter(e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)),
     adminPins: list(kv['admin passwords'] || kv['admin pins']),
     viewerCode: kv['viewer code'] || '',
