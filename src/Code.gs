@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.21.1';
+const APP_VERSION = '1.22.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -192,13 +192,56 @@ function verifyCaptain(team, code) {
   try { authorizeTeam_({ code: code }, team); return true; } catch (e) { return false; }
 }
 
+/** "U15 Mixed Team Div 2", "U15 Mixed Div 2" and "u15-mixed-div2" all compare equal; so do "U17 Div 6" and "U17 Boys Div 6". */
+function normTeam_(t) { return String(t || '').toLowerCase().replace(/\b(team|boys)\b/g, '').replace(/[^a-z0-9]/g, ''); }
+function ourTeamNames_() {
+  return Array.from(new Set(readTeamInfo_().map(t => t.team).concat(readMatches_().map(m => m.ourTeam)).filter(Boolean)));
+}
+function resolveTeam_(name, teams) { const n = normTeam_(name); return n ? (teams.find(t => normTeam_(t) === n) || '') : ''; }
+
+/**
+ * Players tab in either layout:
+ *  - list:  Team | Player | Gender (B/G) | Sub        (row 1 has a "Player" header)
+ *  - wide:  one column per team, like the club team sheet: team name in one of the top rows
+ *           ("U15 Mixed Team Div 2", or "T6" with the name in the Age group row), players below,
+ *           a "Subs" row, and girls marked with a pink/red cell background.
+ * Team names are matched to our teams loosely (see normTeam_). Unmatched rows are kept with their own name.
+ */
 function readPlayers_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(PLAYERS_SHEET);
-  if (!sh) return [];
-  return sh.getDataRange().getDisplayValues().slice(1)
-    .map(r => ({ team: String(r[0]).trim(), name: String(r[1]).trim(), gender: /^g/i.test(String(r[2] || '').trim()) ? 'G' : /^b/i.test(String(r[2] || '').trim()) ? 'B' : '',
-                 sub: /^(y|sub)/i.test(String(r[3] || '').trim()) }))
-    .filter(p => p.team && p.name);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const range = sh.getDataRange(), vals = range.getDisplayValues();
+  const teams = ourTeamNames_();
+  const isList = vals[0].some(h => /^player/i.test(String(h).trim()));
+  if (isList) {
+    return vals.slice(1).map(r => {
+      const raw = String(r[0]).trim();
+      return { team: resolveTeam_(raw, teams) || raw, name: String(r[1]).trim(),
+               gender: /^g/i.test(String(r[2] || '').trim()) ? 'G' : /^b/i.test(String(r[2] || '').trim()) ? 'B' : '',
+               sub: /^(y|sub)/i.test(String(r[3] || '').trim()) };
+    }).filter(p => p.team && p.name);
+  }
+  // wide layout
+  let bgs = []; try { bgs = range.getBackgrounds(); } catch (e) {}
+  const pink = hex => { const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || ''); if (!m) return false;
+    const [r, g, b] = [1, 2, 3].map(i => parseInt(m[i], 16)); return r > 200 && r - g > 20 && r - b > 20; };
+  const labelRow = r => /^(team|age|manager|captain|section|division)/i.test(String(vals[r][0] || '').trim());
+  let start = 0; while (start < vals.length && start < 6 && labelRow(start)) start++;
+  if (start === 0) start = 1;
+  const out = [];
+  for (let c = 0; c < vals[0].length; c++) {
+    let team = '';
+    for (let r = 0; r < start && !team; r++) team = resolveTeam_(vals[r][c], teams);
+    if (!team) continue;
+    let sub = false;
+    for (let r = start; r < vals.length; r++) {
+      if (vals[r].some(x => /^subs?:?$/i.test(String(x).trim()))) { sub = true; continue; }   // the "Subs" divider row
+      const v = String(vals[r][c] || '').trim();
+      if (!v) continue;
+      out.push({ team: team, name: v, gender: pink((bgs[r] || [])[c]) ? 'G' : 'B', sub: sub, col: c + 1, row: r + 1 });
+    }
+  }
+  return out;
 }
 
 function lineupsSheet_() {
@@ -257,7 +300,7 @@ function getLineupData(auth, row, fp) {
   const type = sheetType_(m.ourTeam, t.division);
   const saved = readLineups_().find(l => l.key === matchKey_(m)) || null;
   const players = readPlayers_();
-  const own = players.filter(p => p.team.toLowerCase() === m.ourTeam.toLowerCase());
+  const own = players.filter(p => normTeam_(p.team) === normTeam_(m.ourTeam)).map(p => ({ name: p.name, gender: p.gender, sub: p.sub }));
   return { who: who, type: type, slots: SHEET_SLOTS[type], own: own, others: [],     // only this team's players
            saved: saved, defaults: lineupDefaults_(m), home: /^home/i.test(m.venue),
            templateSet: !!docIdFrom_(type === 'mixed' ? getSettings_().mixedTemplate : getSettings_().boysTemplate) };
@@ -362,8 +405,11 @@ function checkMatchSheetSetup() {
     } catch (e) { msgs.push('✗ ' + n + ' template: can\'t open it (is it a Google Doc in your Drive?)'); }
   });
   try { msgs.push('✓ Folder: ' + matchSheetsFolder_().getName()); } catch (e) { msgs.push('✗ Folder: ' + e.message); }
-  const players = readPlayers_().length, codes = readTeamInfo_().filter(t => t.code).length;
+  const pl = readPlayers_(), players = pl.length, codes = readTeamInfo_().filter(t => t.code).length;
   msgs.push((players ? '✓ ' : '⚠ ') + players + ' players in the Players tab');
+  ourTeamNames_().sort().forEach(t => { const n = pl.filter(p => normTeam_(p.team) === normTeam_(t)).length; msgs.push('   ' + (n ? '✓ ' : '⚠ ') + t + ': ' + n); });
+  const unmatched = Array.from(new Set(pl.filter(p => !resolveTeam_(p.team, ourTeamNames_())).map(p => p.team)));
+  if (unmatched.length) msgs.push('⚠ Team names in Players not matching any team: ' + unmatched.join(', '));
   msgs.push((codes ? '✓ ' : '⚠ ') + codes + ' team(s) have a captain code (Admin → Teams & managers)');
   try { SpreadsheetApp.getUi().alert('Match sheets setup\n\n' + msgs.join('\n')); } catch (e) { console.log(msgs.join('\n')); }
 }
@@ -984,13 +1030,24 @@ function ensurePlayersSheet_() {
 
 /** New names typed by a captain are added to that team's list (gender from the slot they were picked for). */
 function addNewPlayers_(team, defs, slots) {
-  const known = new Set(readPlayers_().map(p => p.name.toLowerCase()));
+  const players = readPlayers_();
+  const known = new Set(players.filter(p => normTeam_(p.team) === normTeam_(team)).map(p => p.name.toLowerCase()));
   const sh = SpreadsheetApp.getActive().getSheetByName(PLAYERS_SHEET);
   if (!sh) return;
+  const wide = sh.getLastRow() >= 1 && !sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getDisplayValues()[0].some(h => /^player/i.test(String(h).trim()));
+  const teamCol = (players.find(p => p.col && normTeam_(p.team) === normTeam_(team)) || {}).col;
   defs.forEach((d, i) => (slots[i] || []).forEach((name, j) => {
     if (!name || known.has(name.toLowerCase())) return;
     const g = d.g === 'BG' ? (j === 0 ? 'B' : 'G') : d.g;
-    sh.appendRow([team, name, g, '']);
+    if (wide && teamCol) {                                    // wide sheet: next empty cell at the bottom of the team's column
+      const colVals = sh.getRange(1, teamCol, Math.max(sh.getLastRow(), 1), 1).getDisplayValues();
+      let r = colVals.length; while (r > 0 && !String(colVals[r - 1][0]).trim()) r--;
+      const cell = sh.getRange(r + 1, teamCol);
+      cell.setValue(name);
+      if (g === 'G') cell.setBackground('#f4cccc');
+    } else {
+      sh.appendRow([team, name, g, '']);
+    }
     known.add(name.toLowerCase());
   }));
 }

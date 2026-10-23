@@ -173,13 +173,28 @@
   .dbtns .editbtn{margin-top:0}
   .lubtn{border:1.5px solid var(--accent);background:transparent;color:var(--accent);border-radius:7px;padding:5px 12px;font-size:13px;font-weight:700;cursor:pointer}
   .lubtn .ok{color:var(--s-ok);font-weight:700}
-  .slot{display:grid;grid-template-columns:110px 1fr;gap:6px;align-items:center;margin-bottom:6px}
-  .slot .sl{font-size:12px;font-weight:700;color:var(--muted)}
-  .slot .pick{display:flex;flex-direction:column;gap:4px;min-width:0}
-  .slot select{padding:7px;font-size:14px}
-  .luwarn{font-size:12.5px;color:var(--s-warn);margin-top:8px;line-height:1.5}
-  .ludone{display:none;margin-top:12px;padding:10px;border-radius:10px;background:color-mix(in srgb,var(--mint) 18%,var(--card));font-size:14px}
-  .ludone a{display:inline-block;margin:6px 8px 0 0;padding:8px 12px;border-radius:8px;font-weight:700;text-decoration:none}
+  /* line-up sheet: fills the phone screen; header and buttons fixed, only the middle scrolls if ever needed */
+  .sheet.lu{display:flex;flex-direction:column;padding:0;max-height:100dvh;height:auto;overflow:hidden}
+  .luhead{padding:10px 12px 6px;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .lutop{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .lutop b{font-size:15px} .lutop span{font-size:12px;color:var(--muted)}
+  .lusum{display:block;width:100%;text-align:left;border:0;background:none;padding:4px 0 0;font-size:12px;color:var(--accent);cursor:pointer}
+  .fgrid.ludet{display:none;margin-top:6px;gap:6px} .fgrid.ludet.open{display:grid}
+  .ludet input{padding:6px 8px;font-size:14px} .ludet label{margin-bottom:1px;font-size:11px}
+  .lubody{flex:1 1 auto;overflow:auto;padding:6px 12px 4px;-webkit-overflow-scrolling:touch}
+  .luside{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+  .luside span{font-size:10.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .luauto{border:1.5px solid var(--accent);background:transparent;color:var(--accent);border-radius:7px;padding:3px 9px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .slot{display:grid;grid-template-columns:78px 1fr 1fr;gap:4px;align-items:center;margin-bottom:4px}
+  .slot .sl{font-size:11px;font-weight:700;color:var(--muted);line-height:1.15}
+  .slot select{padding:5px 4px;font-size:13px;min-width:0;width:100%;border-radius:7px}
+  .slot select.wide{grid-column:span 2}
+  .luwarn{font-size:11.5px;color:var(--s-warn);margin-top:4px;line-height:1.4}
+  .lubody .err{margin-top:2px;font-size:12px;min-height:0}
+  .ludone{display:none;margin-top:6px;padding:6px 8px;border-radius:9px;background:color-mix(in srgb,var(--mint) 18%,var(--card));font-size:13px}
+  .ludone a{display:inline-block;margin:4px 6px 0 0;padding:6px 10px;border-radius:7px;font-weight:700;text-decoration:none;font-size:13px}
+  .lufoot{display:flex;gap:6px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);flex:0 0 auto;background:var(--card)}
+  .lufoot .btn{padding:10px 6px;font-size:14px}
   .ludone .pdf{background:var(--navy);color:#fff} .ludone .gdoc{border:1.5px solid var(--accent);color:var(--accent)}
   .reports{display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px solid var(--accent);color:var(--accent);
     background:color-mix(in srgb,var(--mint) 10%,var(--card));border-radius:8px;padding:7px 10px;font-size:13px;font-weight:700;text-decoration:none}
@@ -412,27 +427,30 @@
 
 <!-- Line-up & match sheet -->
 <div class="overlay" id="luOverlay">
-  <div class="sheet">
-    <h2 id="luTitle">Line-up</h2>
-    <div class="hint" id="luSub" style="margin-top:-6px"></div>
-    <div class="fgrid">
-      <div><label>Age group</label><input id="lu_age"></div>
-      <div><label>Division</label><input id="lu_division"></div>
-      <div><label>Section</label><input id="lu_section" placeholder="if any"></div>
-      <div></div>
-      <div><label>Home team (on sheet)</label><input id="lu_homeName"></div>
-      <div><label>Away team (on sheet)</label><input id="lu_awayName"></div>
+  <div class="sheet lu">
+    <div class="luhead">
+      <div class="lutop"><b id="luTitle">Line-up</b><span id="luSub"></span></div>
+      <button type="button" class="lusum" id="luSum" aria-expanded="false"></button>
+      <div class="fgrid ludet" id="luDet">
+        <div><label>Age group</label><input id="lu_age"></div>
+        <div><label>Division</label><input id="lu_division"></div>
+        <div><label>Section</label><input id="lu_section" placeholder="if any"></div>
+        <div></div>
+        <div><label>Home team (on sheet)</label><input id="lu_homeName"></div>
+        <div><label>Away team (on sheet)</label><input id="lu_awayName"></div>
+      </div>
     </div>
-    <h4 id="luSide">Our players</h4>
-    <div id="luSlots"></div>
-    <button type="button" class="lbtn" id="luAuto">↻ Fill doubles &amp; mixed pairs from the singles</button>
-    <div class="luwarn" id="luWarn"></div>
-    <div class="err" id="luErr"></div>
-    <div class="ludone" id="luDone"></div>
-    <div class="row">
+    <div class="lubody">
+      <div class="luside"><span id="luSide">Our players</span><button type="button" class="luauto" id="luAuto">↻ Fill pairs</button></div>
+      <div id="luSlots"></div>
+      <div class="luwarn" id="luWarn"></div>
+      <div class="err" id="luErr"></div>
+      <div class="ludone" id="luDone"></div>
+    </div>
+    <div class="lufoot">
       <button class="btn ghost" id="luCancel">Close</button>
       <button class="btn ghost" id="luSave">Save</button>
-      <button class="btn primary" id="luMake">Create match sheet</button>
+      <button class="btn primary" id="luMake">Create sheet</button>
     </div>
   </div>
 </div>
@@ -629,15 +647,16 @@ async function openLineup(m){
   state.lu = { m, auth, d, added: [] };
   const home = d.home, src = d.saved || {};
   $('luTitle').textContent = m.ourTeam + ' v ' + m.opponent;
-  $('luSub').textContent = (isISO(m.date) ? dayLabel(m.date) : (m.dateNote || 'Date TBC')) + (m.time ? ' · ' + m.time : '') + ' · ' + (home ? 'Home' : 'Away') + (m.place ? ' · ' + m.place : '');
+  $('luSub').textContent = (isISO(m.date) ? shortDate(m.date) : (m.dateNote || 'Date TBC')) + (m.time ? ' · ' + m.time : '') + (m.place ? ' · ' + m.place : '');
   ['age','division','section','homeName','awayName'].forEach(k => $('lu_'+k).value = (src[k] !== undefined && src[k] !== '' ? src[k] : d.defaults[k]) || '');
-  $('luSide').textContent = 'Our players – ' + (home ? 'Home (left) column' : 'Away (right) column') + (d.type === 'mixed' ? ' · Mixed sheet' : ' · Boys sheet');
+  $('luSide').textContent = (home ? 'Home – left column' : 'Away – right column') + (d.type === 'mixed' ? ' · mixed sheet' : ' · boys sheet');
+  $('luDet').classList.remove('open'); updateSummary();
   renderSlots(d.saved ? d.saved.slots : defaultSlots(d));
   $('luErr').textContent = ''; $('luDone').style.display = 'none';
   if(d.saved && d.saved.docUrl) showDone(d.saved.docUrl);
   $('luMake').disabled = !d.templateSet;
   $('luMake').title = d.templateSet ? '' : 'The match-sheet template isn’t set up yet (Settings)';
-  if(!d.own.length) $('luErr').textContent = 'No players listed for ' + m.ourTeam + ' yet – add them in the Players tab of the sheet.';
+  if(!d.own.length) $('luErr').textContent = 'No players found for ' + m.ourTeam + ' in the Players tab. Ask an admin to run Fixtures App → Match sheets: check setup.';
   $('luOverlay').classList.add('show');
 }
 function poolFor(d, g){
@@ -657,9 +676,10 @@ function selectHTML(d, g, value){
 }
 function renderSlots(slots){
   const d = state.lu.d;
-  $('luSlots').innerHTML = d.slots.map((s, i) => '<div class="slot"><span class="sl">'+esc(s.label)+'</span><div class="pick">' +
-    Array.from({length: s.n}, (_, j) => '<select data-i="'+i+'" data-j="'+j+'">' + selectHTML(d, s.g === 'BG' ? (j === 0 ? 'B' : 'G') : s.g, ((slots||[])[i]||[])[j] || '') + '</select>').join('') +
-    '</div></div>').join('');
+  $('luSlots').innerHTML = d.slots.map((s, i) => '<div class="slot"><span class="sl">'+esc(s.label)+'</span>' +
+    Array.from({length: s.n}, (_, j) => '<select'+(s.n === 1 ? ' class="wide"' : '')+' data-i="'+i+'" data-j="'+j+'" aria-label="'+esc(s.label)+(s.n>1?' player '+(j+1):'')+'">' +
+      selectHTML(d, s.g === 'BG' ? (j === 0 ? 'B' : 'G') : s.g, ((slots||[])[i]||[])[j] || '') + '</select>').join('') +
+    '</div>').join('');
   $('luSlots').querySelectorAll('select').forEach(el => el.onchange = () => {
     if(el.value === '__new'){                                         // captain types a player not on the list
       const s = d.slots[+el.dataset.i], g = s.g === 'BG' ? (+el.dataset.j === 0 ? 'B' : 'G') : s.g;
@@ -709,11 +729,18 @@ function checkLineup(){
   if(empty) warn.push(empty + ' empty place' + (empty===1?'':'s') + ' – they’ll be left blank on the sheet');
   $('luWarn').innerHTML = warn.length ? '⚠ ' + warn.map(esc).join('<br>⚠ ') : '<span style="color:var(--s-ok)">✓ Everyone plays two matches</span>';
 }
+function updateSummary(){
+  const v = k => $('lu_'+k).value.trim();
+  $('luSum').textContent = '✏️ ' + [v('age'), v('division'), v('section') ? 'Section ' + v('section') : ''].filter(Boolean).join(' · ') +
+    '  ·  ' + v('homeName') + ' v ' + v('awayName') + '  (tap to edit)';
+}
+$('luSum').onclick = () => { const o = $('luDet').classList.toggle('open'); $('luSum').setAttribute('aria-expanded', o); };
+['age','division','section','homeName','awayName'].forEach(k => $('lu_'+k).addEventListener('input', updateSummary));
 function luForm(){ const f = { slots: readSlots() }; ['age','division','section','homeName','awayName'].forEach(k => f[k] = $('lu_'+k).value.trim()); return f; }
 function showDone(docUrl, pdfUrl){
   const id = (docUrl.match(/[-\w]{25,}/)||[''])[0];
   pdfUrl = pdfUrl || (id ? 'https://docs.google.com/document/d/'+id+'/export?format=pdf' : '');
-  $('luDone').innerHTML = '✓ Match sheet ready<br><a class="pdf" target="_blank" rel="noopener" href="'+esc(pdfUrl)+'">🖨 Open PDF to print</a>' +
+  $('luDone').innerHTML = '✓ Match sheet ready <a class="pdf" target="_blank" rel="noopener" href="'+esc(pdfUrl)+'">🖨 Open PDF to print</a>' +
     '<a class="gdoc" target="_blank" rel="noopener" href="'+esc(docUrl)+'">Open in Google Docs</a>';
   $('luDone').style.display = 'block';
 }

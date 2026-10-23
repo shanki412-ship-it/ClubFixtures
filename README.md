@@ -156,7 +156,10 @@ Change or clear it in Settings; it must start with https://.
 
 Captains fill the line-up in the app and get the league score sheet filled in and ready to print.
 
-- **Players tab** (created automatically, pre-loaded with the 2026-27 club squads): `Team | Player | Gender (B/G) | Sub`, one row per player. Team must match the
+- **Players tab** (created automatically, pre-loaded with the 2026-27 club squads): either a list
+  `Team | Player | Gender (B/G) | Sub`, or the club team-sheet layout (one column per team, team name in a top row
+  such as "U15 Mixed Team Div 2" or the Age group row, a "Subs" row, girls in pink cells). Team names are matched
+  loosely ("Team"/"Boys" and punctuation ignored). **Fixtures App → Match sheets: check setup** shows players per team. Team must match the
   Teams tab. Gender is needed for mixed teams. Row order is the default order in the dropdowns.
 - **Captain codes**: Admin → Teams & managers → tap our team → *Captain code*. A code only works for its own team;
   admins can do every team. Codes are never sent to the page.
