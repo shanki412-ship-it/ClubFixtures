@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.26.0';
+const APP_VERSION = '1.27.0';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -152,6 +152,7 @@ function onOpen() {
     .addItem('Split time into Time + Location columns', 'splitIntoSeparateColumns')
     .addSeparator()
     .addItem('Match sheets: check setup', 'checkMatchSheetSetup')
+    .addItem('Tidy team names (shows changes first)', 'tidyTeamNames')
     .addSeparator()
     .addItem('Weekly email: send a test now (next week)', 'sendWeeklyEmailTest')
     .addItem('Weekly email: turn ON (Mondays ~7am)', 'turnOnWeeklyEmail')
@@ -200,11 +201,10 @@ function playersOfTeam_(team, players) {
   players = players || readPlayers_();
   const exact = players.filter(p => normTeam_(p.team) === normTeam_(team));
   if (exact.length) return exact;
-  const strip = t => String(t || '').replace(/\s+-\s+[^-]+$/, '');   // drop any trailing " - Dev" / " - A1"
-  const base = normTeam_(strip(team));
-  return players.filter(p => normTeam_(p.team) === base || normTeam_(strip(p.team)) === base);
+  const want = canonicalOurTeam_(team), k = teamKey_(want);
+  return players.filter(p => canonicalOurTeam_(p.team) === want || (k && teamKey_(p.team) === k));
 }
-function resolveTeam_(name, teams) { const n = normTeam_(name); return n ? (teams.find(t => normTeam_(t) === n) || '') : ''; }
+function resolveTeam_(name, teams) { const t = findOurTeam_(name, teams.map(x => ({ team: x }))); return t ? t.team : ''; }
 
 /**
  * Players tab in either layout:
@@ -280,21 +280,6 @@ function readLineupFlags_() {
   return out;
 }
 
-/**
- * Team names as printed on the score sheet.
- *  ours: the club name, plus a team code like A1/A2 (needed when two club teams share a division) –
- *        but not a manager's name ("U17 Mixed Div 1 - Dev" → "ACBC").
- *  theirs: the opponent without anything after " - " ("Dunboyne - U17 Mixed Div 1" → "Dunboyne").
- */
-function ourSheetName_(team) {
-  const suffix = (String(team).match(/\s+-\s+(.+?)\s*$/) || [])[1] || '';
-  return getSettings_().clubName + (/^[A-Z]?\d+$/i.test(suffix) ? ' ' + suffix : '');
-}
-function oppSheetName_(opponent) {
-  const m = String(opponent || '').trim().match(/^(.*?)\s+-\s+(.+)$/);
-  if (!m) return String(opponent || '').trim();
-  return /^[A-Z]?\d+$/i.test(m[2].trim()) ? m[1] + ' ' + m[2].trim() : m[1];   // keep team codes like "ACBC - A2"
-}
 /** Clean a home/away name from an older line-up or form ("ACBC Dev" → "ACBC", "X - U17 Mixed Div 1" → "X"). */
 function cleanSheetName_(name, isOurs, team) {
   name = String(name || '').trim();
@@ -305,7 +290,7 @@ function cleanSheetName_(name, isOurs, team) {
 }
 
 function lineupDefaults_(m) {
-  const t = readTeamInfo_().find(x => x.team.toLowerCase() === m.ourTeam.toLowerCase()) || {};
+  const t = findOurTeam_(m.ourTeam) || {};
   const division = t.division || guessDivision_(m.ourTeam);
   const age = (m.ourTeam.match(/U\s?\d+/i) || [''])[0].replace(/\s/g, '').toUpperCase();
   const divNo = (division.match(/div\w*\s*(\d+)/i) || [])[1];
@@ -325,7 +310,7 @@ function findMatchByRow_(row, fp) {
 function getLineupData(auth, row, fp) {
   const m = findMatchByRow_(row, fp);
   const who = authorizeTeam_(auth, m.ourTeam);
-  const t = readTeamInfo_().find(x => x.team.toLowerCase() === m.ourTeam.toLowerCase()) || {};
+  const t = findOurTeam_(m.ourTeam) || {};
   const type = sheetType_(m.ourTeam, t.division);
   const saved = readLineups_().find(l => l.key === matchKey_(m)) || null;
   if (saved) {                                               // tidy names saved by earlier versions
@@ -343,7 +328,7 @@ function getLineupData(auth, row, fp) {
 function saveLineup(auth, row, fp, form, makeDoc) {
   const m = findMatchByRow_(row, fp);
   authorizeTeam_(auth, m.ourTeam);
-  const t = readTeamInfo_().find(x => x.team.toLowerCase() === m.ourTeam.toLowerCase()) || {};
+  const t = findOurTeam_(m.ourTeam) || {};
   const type = sheetType_(m.ourTeam, t.division), defs = SHEET_SLOTS[type];
   const clean = v => String(v || '').trim().slice(0, 60);
   const slots = defs.map((d, i) => ((form.slots || [])[i] || []).slice(0, d.n).map(clean));
@@ -420,6 +405,25 @@ function checkMatchSheetSetup() {
   try { SpreadsheetApp.getUi().alert('Match sheets setup\n\n' + msgs.join('\n')); } catch (e) { console.log(msgs.join('\n')); }
 }
 
+/**
+ * WhatsApp message (same wording as the app):
+ *   Hi Prashanth,
+ *   About U13 Boys Div 5: ACBC A1 vs ACE on Fri 13 Nov at 18:30, Celbridge.
+ */
+function waMessage_(m, name) {
+  const t = findOurTeam_(m.ourTeam) || {};
+  const div = t.division || guessDivision_(canonicalOurTeam_(m.ourTeam));
+  const place = m.place && !/^(tbc|internal)$/i.test(m.place) ? m.place : '';
+  const date = m.date ? Utilities.formatDate(toDate_(m.date), Session.getScriptTimeZone(), 'EEE d MMM') : '';
+  let when;
+  if (date) when = ' on ' + date + (m.time ? ' at ' + m.time : ' (time TBC)') + (place ? ', ' + place : ', location TBC');
+  else {
+    const missing = ['date', !m.time && 'time', !place && 'location'].filter(Boolean);
+    when = ' – ' + missing.join(', ').replace(/, ([^,]*)$/, ' and $1') + ' TBC' + (place ? ', ' + place : '');
+  }
+  return 'Hi ' + (name || '') + ',\nAbout ' + div + ': ' + ourSheetName_(m.ourTeam) + ' vs ' + oppSheetName_(m.opponent) + when + '.';
+}
+
 /* ---------------- Monday email ---------------- */
 
 /** Trigger target: runs every Monday morning and emails this week's (Mon–Sun) matches. */
@@ -469,7 +473,7 @@ function buildWeeklyEmail_(monday) {
   const appUrl = (() => { try { return ScriptApp.getService().getUrl() || ''; } catch (e) { return ''; } })();
 
   const places = {}; readPlaceList_().forEach(p => places[p.name.toLowerCase()] = p);
-  const teams = {}; readTeamInfo_().forEach(t => teams[t.team.toLowerCase()] = t);
+  const tinfo = readTeamInfo_(), divLists = readDivisions_();
   const opps = readOpponentInfo_();
   const all = readMatches_();
   const week = all.filter(m => m.date && m.date >= from && m.date <= to && !m.result)
@@ -481,7 +485,7 @@ function buildWeeklyEmail_(monday) {
     let d = String(phone || '').replace(/[^0-9+]/g, '');
     if (d[0] === '+') d = d.slice(1); else if (d.slice(0, 2) === '00') d = d.slice(2); else if (d[0] === '0') d = '353' + d.slice(1);
     if (d.length < 8) return esc(name || '');
-    const txt = 'Hi ' + (name || '') + ', about ' + m.ourTeam + ' v ' + m.opponent + ' – ';
+    const txt = waMessage_(m, name);
     return '<a href="https://wa.me/' + d + '?text=' + encodeURIComponent(txt) + '" style="color:#128c4a;font-weight:bold;text-decoration:none">' + esc(name || phone) + '</a>';
   };
   const mapLink = m => {
@@ -500,7 +504,9 @@ function buildWeeklyEmail_(monday) {
       text += day + '\n'; lastDay = day;
     }
     const home = /^home/i.test(m.venue), colour = home ? '#2563eb' : '#ea580c';
-    const t = teams[m.ourTeam.toLowerCase()] || {}, o = opps.find(x => x.team.toLowerCase() === m.opponent.toLowerCase() && x.division === t.division) || {};
+    const t = findOurTeam_(m.ourTeam, tinfo) || {};
+    const oppName = t.division ? canonicalOpp_(m.opponent, t.division, divLists, tinfo) : m.opponent;
+    const o = opps.find(x => x.division === t.division && normTeam_(x.team) === normTeam_(oppName)) || {};
     const mgrs = [t.manager ? '👤 ' + wa(t.phone, t.manager, m) : '', o.manager ? 'vs ' + wa(o.phone, o.manager, m) : ''].filter(Boolean).join(' &nbsp; ');
     rows += '<tr><td style="padding:8px 10px;border-left:4px ' + (confirmed(m) ? 'solid' : 'dashed') + ' ' + colour + ';background:#fff;vertical-align:top;width:56px;font:bold 15px Arial,sans-serif;color:#151a30">' + esc(m.time || 'TBC') + '</td>' +
       '<td style="padding:8px 6px;background:#fff;vertical-align:top;font:14px Arial,sans-serif;color:#151a30">' +
@@ -609,7 +615,8 @@ function saveMatch(pin, match, rowNumber, fp) {
     } else {
       set('time', joinTimeCell_(m.place, m.time), '@');
     }
-    addToDivision_(divisionOfTeam_(m.ourTeam), m.opponent);   // new opponents join the division list
+    const d = divisionOfTeam_(m.ourTeam);
+    if (d) addToDivision_(d, canonicalOpp_(m.opponent, d));     // new opponents join the division list (standard name)
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
@@ -641,9 +648,9 @@ function payload_(s) {
   // One entry per team: fixture names first; a Teams-tab name is only added if no fixture team is the same team
   // (so "U17 Mixed Div 1" in Teams and "U17 Mixed Div 1 - Dev" in the fixtures show once).
   const fixtureTeams = Array.from(new Set(matches.map(m => m.ourTeam).filter(Boolean)));
-  const strip = t => String(t || '').replace(/\s+-\s+[^-]+$/, '');
-  const same = (a, b) => normTeam_(a) === normTeam_(b) || normTeam_(strip(a)) === normTeam_(b) || normTeam_(a) === normTeam_(strip(b));
-  const teams = fixtureTeams.concat(readTeamInfo_().map(t => t.team).filter(t => t && !fixtureTeams.some(f => same(f, t)))).sort();
+  const tinfo = readTeamInfo_();
+  const covered = new Set(fixtureTeams.map(f => (findOurTeam_(f, tinfo) || {}).team).filter(Boolean));
+  const teams = fixtureTeams.concat(tinfo.map(t => t.team).filter(t => t && !covered.has(t) && fixtureTeams.indexOf(t) < 0)).sort();
   return {
     clubName: s.clubName,
     title: s.title,
@@ -1137,14 +1144,17 @@ function saveOpponent(pin, division, team, manager, phone) {
 
 /** How many fixtures in a division involve this team (as opponent, or as our team). */
 function fixturesUsingTeam_(division, team) {
-  const k = String(team || '').trim().toLowerCase();
-  const divOf = {}; readTeamInfo_().forEach(t => divOf[t.team.toLowerCase()] = t.division);
-  return readMatches_().filter(m => (divOf[m.ourTeam.toLowerCase()] || guessDivision_(m.ourTeam)) === division &&
-    (m.opponent.toLowerCase() === k || m.ourTeam.toLowerCase() === k)).length;
+  const teams = readTeamInfo_(), divLists = readDivisions_();
+  const want = isOurName_(team, teams) ? canonicalOurTeam_(team, teams) : canonicalOpp_(team, division, divLists, teams);
+  return readMatches_().filter(m => {
+    const t = findOurTeam_(m.ourTeam, teams);
+    if ((t ? t.division : guessDivision_(m.ourTeam)) !== division) return false;
+    return canonicalOpp_(m.opponent, division, divLists, teams) === want || (t && t.team === want);
+  }).length;
 }
 
 function divisionOfTeam_(team) {
-  const t = readTeamInfo_().find(x => x.team.toLowerCase() === String(team).toLowerCase());
+  const t = findOurTeam_(team);
   return t ? t.division : '';
 }
 

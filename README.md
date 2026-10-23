@@ -152,6 +152,21 @@ teams with fixtures show their match count instead, and the server refuses the r
 **📝 Match reports & scoring sheets** button on the Fixtures tab and in the Monday email.
 Change or clear it in Settings; it must start with https://.
 
+## Team names
+
+One standard everywhere (Fixtures, Teams, Divisions, Players):
+- **Our teams**: the division, plus A1/A2 only when we have two teams in it – `U13 Boys Div 5 - A1`, `U17 Mixed Div 1`.
+  Managers belong in the Teams tab's Manager column, not in the team name.
+- **Opponents**: club and team number as the league writes them – `Dunboyne 1`, `Kerela 1`.
+- **Internal matches**: the opponent is our other team – `U13 Boys Div 5 - A2` (shown and printed as **ACBC A2**).
+
+The app also understands common variants (`U17 Mixed Div 1 - Dev`, `U13 Boys Div 5 - A1 - Prashanth`,
+`ACBC - A1 - U13 Boys Div 5`, `Dunboyne - U17 Mixed Div 1`, `U15 Mixed Team Div 2`, `U17 Div 6`) – rules in `src/Names.gs`.
+**Fixtures App → Tidy team names** lists every rename and duplicate it would fix and only changes the sheet when you
+click **Yes** (managers/phones on removed duplicates are kept; saved line-ups follow the new names).
+
+WhatsApp messages: `Hi Prashanth,` / `About U13 Boys Div 5: ACBC A1 vs ACE on Fri 13 Nov at 18:30, Celbridge.`
+
 ## Line-ups & match sheets
 
 Captains fill the line-up in the app and get the league score sheet filled in and ready to print.

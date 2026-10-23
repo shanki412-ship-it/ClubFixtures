@@ -539,13 +539,51 @@ function shortTeam(t){
 // Team names are matched loosely: "U15 Mixed Team Div 2" = "U15 Mixed Div 2", and a trailing " - X"
 // (manager name, division…) is ignored if there's no exact match: "U17 Mixed Div 1 - Dev" → "U17 Mixed Div 1".
 const normTeam = t => String(t || '').toLowerCase().replace(/\b(team|boys)\b/g, '').replace(/[^a-z0-9]/g, '');
-const stripSuffix = t => String(t || '').replace(/\s+-\s+[^-]+$/, '');
-function looseFind(list, name, key){
-  const n = normTeam(name), b = normTeam(stripSuffix(name));
-  return list.find(x => x[key] === name) || list.find(x => normTeam(x[key]) === n) ||
-         list.find(x => normTeam(stripSuffix(x[key])) === b) || null;
+// Same team-name rules as the server (Names.gs): "U13 Boys Div 5 - A1 - Prashanth", "ACBC - A1 - U13 Boys Div 5"
+// and "U13 Boys Div 5 A1" are all U13 Boys Div 5 - A1; A1 and A2 are never mixed up.
+function teamKey(name){
+  const parts = String(name || '').split(/\s+-\s+/).map(x => x.trim()).filter(Boolean);
+  let div = parts.find(p => /\bU\s?\d{1,2}\b/i.test(p)) || '';
+  let code = parts.find(p => /^(?!U\d)[A-Z]\d{1,2}$/i.test(p)) || '';
+  const tail = div.match(/\s((?!U\d)[A-Z]\d{1,2})$/i);
+  if(tail){ if(!code) code = tail[1]; div = div.slice(0, -tail[0].length); }
+  return div ? normTeam(div) + '|' + code.toLowerCase() : '';
 }
-function teamInfo(team){ return looseFind(state.data.teamInfo || [], team, 'team'); }
+function findOurTeam(name){
+  const list = state.data.teamInfo || [], n = String(name || '').trim().toLowerCase();
+  if(!n) return null;
+  const exact = list.find(t => t.team.toLowerCase() === n); if(exact) return exact;
+  const loose = list.filter(t => normTeam(t.team) === normTeam(name)); if(loose.length === 1) return loose[0];
+  const k = teamKey(name); if(!k) return null;
+  const byKey = list.filter(t => teamKey(t.team) === k);
+  return byKey.length === 1 ? byKey[0] : null;
+}
+// A name without a division ("ACBC - A2") read in a division
+function findOurTeamIn(name, division){
+  const t = findOurTeam(name); if(t || !division) return t;
+  const code = (String(name || '').split(/\s+-\s+|\s+/).find(p => /^(?!U\d)[A-Z]\d{1,2}$/i.test(p)) || '').toLowerCase();
+  const inDiv = (state.data.teamInfo || []).filter(x => normTeam(x.division) === normTeam(division));
+  const byKey = inDiv.filter(x => teamKey(x.team) === normTeam(division) + '|' + code);
+  return byKey.length === 1 ? byKey[0] : (!code && inDiv.length === 1 ? inDiv[0] : null);
+}
+const nameCode = n => (String(n || '').split(/\s+-\s+|\s+/).find(p => /^(?!U\d)[A-Z]\d{1,2}$/i.test(p)) || '').toUpperCase();
+function isOurName(name){
+  const s = String(name || '').trim(), club = state.data.clubName || '';
+  if(!s) return false;
+  if(club && new RegExp('(^|[^a-z])' + club.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z]|$)', 'i').test(s)) return true;
+  return /\bU\s?\d{1,2}\b/i.test(s.split(/\s+-\s+/)[0]) && !!findOurTeam(s);
+}
+function oppBase(name){
+  const parts = String(name || '').split(/\s+-\s+/).map(x => x.trim()).filter(Boolean);
+  const keep = parts.filter(p => !/\bU\s?\d{1,2}\b/i.test(p));
+  return (keep.length ? keep : parts).join(' ');
+}
+function ourSheetName(team){
+  const t = findOurTeam(team), code = (teamKey(t ? t.team : team).split('|')[1] || '').toUpperCase() || nameCode(team);
+  return (state.data.clubName || '') + (code ? ' ' + code : '');
+}
+function oppSheetName(opponent){ return isOurName(opponent) ? ourSheetName(opponent) : oppBase(opponent); }
+function teamInfo(team){ return findOurTeam(team); }
 function divisionOf(team){ const t = teamInfo(team); return t ? t.division : ''; }
 function managerOf(team){ const t = teamInfo(team); return t ? t.manager : ''; }
 // Opponent contact: only from the same division (e.g. "Kerela 1" in U15 and in U17 are different teams)
@@ -553,7 +591,17 @@ function oppContact(ourTeam, opponent){
   const d = divisionOf(ourTeam);
   if(!d) return null;
   const inDiv = (state.data.oppInfo || []).filter(o => normTeam(o.division) === normTeam(d));
-  return looseFind(inDiv, opponent, 'team');
+  if(isOurName(opponent)){                                    // internal match: our other team's manager
+    const t = findOurTeamIn(opponent, d);
+    return t && (t.manager || t.phone) ? { team: t.team, manager: t.manager, phone: t.phone } : null;
+  }
+  const b = normTeam(oppBase(opponent));
+  const clean = o => !/\s+-\s+/.test(o.team);
+  const same = inDiv.filter(o => normTeam(oppBase(o.team)) === b);
+  const best = same.find(clean) || null;
+  const starts = inDiv.filter(o => clean(o) && normTeam(o.team).indexOf(b) === 0);   // "Dunboyne" → "Dunboyne 1"
+  const pickFrom = [best, starts.length === 1 ? starts[0] : null, same[0]].filter(Boolean);
+  return pickFrom.find(o => o.manager || o.phone) || pickFrom[0] || null;
 }
 // WhatsApp: Irish numbers like "087 123 4567" become 353871234567; "+353…"/"00353…" are kept as international
 // Same rule as the server: Irish 0… numbers or + country code; anything else is flagged
@@ -571,11 +619,23 @@ function waNumber(phone){
   return d.length >= 8 ? d : '';
 }
 const WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3.9 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2.1.7 2.8.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>';
+// Hi Prashanth,
+// About U13 Boys Div 5: ACBC A1 vs ACE on Fri 13 Nov at 18:30, Celbridge.
+function waText(name, m){
+  const t = findOurTeam(m.ourTeam);
+  const div = t ? t.division : String(m.ourTeam).split(/\s+-\s+/)[0];
+  const place = m.place && NO_MAP.indexOf(m.place.toLowerCase()) < 0 ? m.place : '';
+  let when;
+  if(isISO(m.date)) when = ' on ' + shortDate(m.date) + (m.time ? ' at ' + m.time : ' (time TBC)') + (place ? ', ' + place : ', location TBC');
+  else {
+    const missing = ['date', !m.time && 'time', !place && 'location'].filter(Boolean);
+    when = ' – ' + missing.join(', ').replace(/, ([^,]*)$/, ' and $1') + ' TBC' + (place ? ', ' + place : '');
+  }
+  return 'Hi ' + (name || '') + ',\nAbout ' + div + ': ' + ourSheetName(m.ourTeam) + ' vs ' + oppSheetName(m.opponent) + when + '.';
+}
 function waHref(phone, name, m){
   const n = waNumber(phone); if(!n) return '';
-  const when = (isISO(m.date) ? dayLabel(m.date) : (m.dateNote || 'date TBC')) + (m.time ? ' at ' + m.time : '');
-  const msg = 'Hi ' + (name || '') + ', about ' + m.ourTeam + ' v ' + m.opponent + ' (' + when + (m.place && NO_MAP.indexOf(m.place.toLowerCase()) < 0 ? ', ' + m.place : '') + ') – ';
-  return 'https://wa.me/' + n + '?text=' + encodeURIComponent(msg);
+  return 'https://wa.me/' + n + '?text=' + encodeURIComponent(waText(name, m));
 }
 function waLink(phone, name, m, label){
   const h = waHref(phone, name, m);
@@ -982,7 +1042,7 @@ function rowHTML(m){
     '<div class="r1"><span class="dt'+(m.date===today?' today':'')+'">'+esc(date)+'</span>'+
     '<span class="tm">'+(esc(m.time)||'–')+'</span>'+
     '<span class="ha '+s+'">'+(s==='home'?'H':s==='away'?'A':'N')+'</span>'+
-    '<span class="who">'+tag+'<span class="opp">'+esc(m.opponent)+'</span>'+at+'</span>'+
+    '<span class="who">'+tag+'<span class="opp">'+esc(oppSheetName(m.opponent) || m.opponent)+'</span>'+at+'</span>'+
     '<span class="rt">'+right+'</span>'+
     '<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6l4.5 4.5L12.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
     managersLine(m)+
