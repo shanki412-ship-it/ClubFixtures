@@ -652,8 +652,6 @@ function selectHTML(d, g, value){
   const extra = (state.lu.added || []).filter(p => (!g || p.gender === g) && !names.has(p.name));
   h += '<optgroup label="'+esc(state.lu.m.ourTeam)+'">' + pool.own.concat(extra).map(p =>
     '<option value="'+esc(p.name)+'"'+(p.name===value?' selected':'')+'>'+esc(p.name)+(p.sub ? ' · sub' : '')+(p.isNew ? ' · new' : '')+'</option>').join('') + '</optgroup>';
-  if(pool.others.length) h += '<optgroup label="Other club players (subs)">' + pool.others.map(p =>
-    '<option value="'+esc(p.name)+'"'+(p.name===value?' selected':'')+'>'+esc(p.name)+' · '+esc(shortTeam(p.team))+'</option>').join('') + '</optgroup>';
   h += '<option value="__new">+ Add a new name…</option>';
   return h;
 }

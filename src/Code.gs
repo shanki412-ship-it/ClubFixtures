@@ -13,7 +13,7 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.21.0';
+const APP_VERSION = '1.21.1';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -258,8 +258,7 @@ function getLineupData(auth, row, fp) {
   const saved = readLineups_().find(l => l.key === matchKey_(m)) || null;
   const players = readPlayers_();
   const own = players.filter(p => p.team.toLowerCase() === m.ourTeam.toLowerCase());
-  const others = players.filter(p => p.team.toLowerCase() !== m.ourTeam.toLowerCase());
-  return { who: who, type: type, slots: SHEET_SLOTS[type], own: own, others: others,
+  return { who: who, type: type, slots: SHEET_SLOTS[type], own: own, others: [],     // only this team's players
            saved: saved, defaults: lineupDefaults_(m), home: /^home/i.test(m.venue),
            templateSet: !!docIdFrom_(type === 'mixed' ? getSettings_().mixedTemplate : getSettings_().boysTemplate) };
 }
