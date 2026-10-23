@@ -149,7 +149,7 @@ teams with fixtures show their match count instead, and the server refuses the r
 ## Match reports link
 
 **Settings → Match Reports URL** (default: the Dublin Juvenile League match-reports page) appears as a
-**📝 Match reports & scoring sheets** button on the Fixtures tab, in each match's details, and in the Monday email.
+**📝 Match reports & scoring sheets** button on the Fixtures tab and in the Monday email.
 Change or clear it in Settings; it must start with https://.
 
 ## Line-ups & match sheets

@@ -953,7 +953,6 @@ function rowHTML(m){
   const details =
     '<div>'+(state.team ? '' : '<b>'+esc(m.ourTeam)+'</b> · ')+'Status: '+esc(m.status||'—')+'</div>'+
     (loc ? '<div>'+loc+'</div>' : '')+
-    (state.data.reportsUrl ? '<div><a target="_blank" rel="noopener" href="'+esc(state.data.reportsUrl)+'">📝 Match report / scoring sheet ↗</a></div>' : '')+
     '<div class="dbtns">'+
       '<button class="lubtn" data-lineup="'+m.row+'">📝 Line-up &amp; match sheet'+((state.data.lineupDocs||{})[mkey(m)] === 'doc' ? ' <span class="ok">✓ ready</span>' : '')+'</button>'+
       (state.pin ? '<button class="editbtn" data-edit="'+m.row+'">Edit match</button>' : '')+'</div>';
