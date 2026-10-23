@@ -174,11 +174,24 @@
   .lubtn{border:1.5px solid var(--accent);background:transparent;color:var(--accent);border-radius:7px;padding:5px 12px;font-size:13px;font-weight:700;cursor:pointer}
   .lubtn .ok{color:var(--s-ok);font-weight:700}
   /* line-up sheet: fills the phone screen; header and buttons fixed, only the middle scrolls if ever needed */
-  .sheet.lu{display:flex;flex-direction:column;padding:0;max-height:100dvh;height:auto;overflow:hidden}
-  .luhead{padding:10px 12px 6px;border-bottom:1px solid var(--line);flex:0 0 auto}
-  .lutop{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-  .lutop b{font-size:15px} .lutop span{font-size:12px;color:var(--muted)}
-  .lusum{display:block;width:100%;text-align:left;border:0;background:none;padding:4px 0 0;font-size:12px;color:var(--accent);cursor:pointer}
+  /* line-up pop-up: dark blurred backdrop, centred card with a navy jersey header and mint frame */
+  #luOverlay{align-items:center;padding:10px;background:rgba(8,11,26,.72);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+  .sheet.lu{display:flex;flex-direction:column;padding:0;max-height:calc(100dvh - 20px);height:auto;overflow:hidden;
+    border:2px solid var(--mint);border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.5);animation:popin .18s ease-out}
+  @keyframes popin{from{transform:scale(.96);opacity:0}to{transform:none;opacity:1}}
+  @media (prefers-reduced-motion: reduce){ .sheet.lu{animation:none} }
+  .luhead{padding:10px 12px 7px;flex:0 0 auto;color:#fff;background-color:var(--navy);border-bottom:3px solid var(--mint);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='120' viewBox='0 0 220 120'%3E%3Cg fill='%237fd8b6' fill-opacity='.14'%3E%3Cpath d='M18 14l34 8-28 22z'/%3E%3Cpath d='M120 6l10 26-24-8z'/%3E%3Cpath d='M176 40l30-6-14 28z'/%3E%3Cpath d='M70 70l26 16-30 10z'/%3E%3C/g%3E%3C/svg%3E")}
+  .lutop{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding-right:26px;position:relative}
+  .lutop b{font-size:15px} .lutop span{font-size:12px;color:var(--mint)}
+  .lux{position:absolute;right:-4px;top:-3px;border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:8px;width:28px;height:28px;font-size:15px;cursor:pointer}
+  .lusum{display:block;width:100%;text-align:left;border:0;background:none;padding:4px 0 0;font-size:12px;color:var(--mint);cursor:pointer}
+  .luhead .ludet label{color:#cfd6e6}
+  .luloading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px 12px;color:var(--muted);font-size:14px}
+  .luloading .spin{width:28px;height:28px;border-width:3px}
+  .btn:disabled{opacity:.45;cursor:default}
+  .btn.busy:disabled,.btn:disabled:has(.spin){opacity:.85}
+  .btn .spin{display:inline-block;width:14px;height:14px;border-width:2px;vertical-align:-2px;margin-right:6px}
   .fgrid.ludet{display:none;margin-top:6px;gap:6px} .fgrid.ludet.open{display:grid}
   .ludet input{padding:6px 8px;font-size:14px} .ludet label{margin-bottom:1px;font-size:11px}
   .lubody{flex:1 1 auto;overflow:auto;padding:6px 12px 4px;-webkit-overflow-scrolling:touch}
@@ -263,6 +276,8 @@
   .upd a,.upd button{border:0;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap}
   .upd .go{background:var(--mint);color:var(--navy)}
   .upd .x{background:transparent;color:#fff;padding:7px 6px}
+  .upd .go.busy{opacity:.85;pointer-events:none;display:inline-flex;align-items:center;gap:6px}
+  .upd .spin{width:13px;height:13px;border-width:2px;border-color:color-mix(in srgb,var(--navy) 30%,transparent);border-top-color:var(--navy)}
   footer{text-align:center;font-size:11px;color:var(--muted);padding:6px 12px 90px}
   footer b{color:var(--ink);font-weight:600}
 </style>
@@ -435,7 +450,7 @@
 <div class="overlay" id="luOverlay">
   <div class="sheet lu">
     <div class="luhead">
-      <div class="lutop"><b id="luTitle">Line-up</b><span id="luSub"></span></div>
+      <div class="lutop"><b id="luTitle">Line-up</b><span id="luSub"></span><button type="button" class="lux" id="luX" aria-label="Close">✕</button></div>
       <button type="button" class="lusum" id="luSum" aria-expanded="false"></button>
       <div class="fgrid ludet" id="luDet">
         <div><label>Age group</label><input id="lu_age"></div>
@@ -448,6 +463,7 @@
     </div>
     <div class="lubody">
       <div class="luside"><span id="luSide">Our players</span><button type="button" class="luauto" id="luAuto">↻ Fill pairs</button></div>
+      <div class="luloading" id="luLoading" style="display:none"><span class="spin" aria-hidden="true"></span><span id="luLoadingMsg">Loading the line-up… please wait</span></div>
       <div id="luSlots"></div>
       <div class="luwarn" id="luWarn"></div>
       <div class="err" id="luErr"></div>
@@ -628,9 +644,11 @@ function askCaptainCode(team){
     $('capOverlay').classList.add('show'); setTimeout(() => $('capInput').focus(), 50);
     $('capCancel').onclick = () => { $('capOverlay').classList.remove('show'); resolve(null); };
     $('capOk').onclick = async () => {
-      const code = $('capInput').value.trim(); if(!code) return;
-      $('capErr').textContent = 'Checking…';
+      const code = $('capInput').value.trim(); if(!code || $('capOk').disabled) return;
+      $('capErr').textContent = ''; $('capOk').disabled = true;
+      $('capOk').innerHTML = '<span class="spin" aria-hidden="true"></span>Checking…';
       const ok = await call('verifyCaptain', team, code).catch(() => false);
+      $('capOk').disabled = false; $('capOk').textContent = 'Continue';
       if(!ok){ $('capErr').textContent = 'That code isn’t right for ' + team + '.'; return; }
       store.set('cap:' + team, code, !$('capRemember').checked);
       $('capOverlay').classList.remove('show'); resolve({ code });
@@ -638,18 +656,36 @@ function askCaptainCode(team){
     $('capInput').onkeydown = e => { if(e.key === 'Enter') $('capOk').click(); };
   });
 }
+// Loading state for the line-up pop-up: header shows the match, body a spinner, buttons disabled
+function luLoading(m, on){
+  if(on){
+    $('luTitle').textContent = m.ourTeam + ' v ' + m.opponent;
+    $('luSub').textContent = isISO(m.date) ? shortDate(m.date) : (m.dateNote || '');
+    $('luSum').style.display = 'none'; $('luDet').classList.remove('open');
+    ['luSlots','luWarn','luErr','luDone'].forEach(id => $(id).innerHTML = '');
+    $('luDone').style.display = 'none';
+    $('luAuto').style.visibility = 'hidden'; $('luSide').textContent = '';
+    $('luOverlay').classList.add('show');
+  } else {
+    $('luSum').style.display = ''; $('luAuto').style.visibility = '';
+  }
+  $('luLoading').style.display = on ? 'flex' : 'none';
+  ['luSave','luMake'].forEach(id => $(id).disabled = on);
+}
 async function openLineup(m){
   if(!m) return;
   let auth = lineupAuth(m.ourTeam) || await askCaptainCode(m.ourTeam);
   if(!auth) return;
-  toast('Loading line-up…');
+  luLoading(m, true);                                   // pop-up opens straight away with "Loading… please wait"
   let d;
   try{ d = await call('getLineupData', auth, m.row, m.fp); }
   catch(e){
+    luLoading(m, false); $('luOverlay').classList.remove('show');
     const msg = e.message || String(e);
     if(/captain code/i.test(msg) && auth.code){ store.del('cap:' + m.ourTeam); store.del('cap:' + m.ourTeam, true); auth = await askCaptainCode(m.ourTeam); if(auth) return openLineup(m); return; }
     toast(msg); return;
   }
+  luLoading(m, false);
   state.lu = { m, auth, d, added: [] };
   const home = d.home, src = d.saved || {};
   $('luTitle').textContent = m.ourTeam + ' v ' + m.opponent;
@@ -792,7 +828,7 @@ async function luSubmit(makeDoc){
   if(btn.disabled) return;
   btn.disabled = true; $('luErr').textContent = '';
   const label = btn.textContent;
-  btn.textContent = makeDoc ? 'Creating…' : 'Saving…';
+  btn.innerHTML = '<span class="spin" aria-hidden="true"></span>' + (makeDoc ? 'Creating…' : 'Saving…');
   if(makeDoc) luStatus('busy', 'Saving the line-up and preparing your match sheet…');
   try{
     const r = await call('saveLineup', auth, m.row, m.fp, luForm(), makeDoc);
@@ -816,13 +852,22 @@ async function luSubmit(makeDoc){
 $('luSave').onclick = () => luSubmit(false);
 $('luMake').onclick = () => luSubmit(true);
 $('luCancel').onclick = () => $('luOverlay').classList.remove('show');
+$('luX').onclick = () => $('luOverlay').classList.remove('show');
 
 // ---- update checks: every 30 min, and when the app comes back to the foreground ----
 const CHECK_EVERY = 30 * 60 * 1000, MIN_GAP = 2 * 60 * 1000;
 function busy(){ return ['formOverlay','placeOverlay','teamOverlay','pinOverlay','oppOverlay','capOverlay','luOverlay'].some(id => $(id).classList.contains('show')); }
 function showUpdate(msg, label, onGo){
   $('updMsg').textContent = msg; $('updGo').textContent = label;
-  $('updGo').onclick = e => { if(onGo){ e.preventDefault(); onGo(); } };
+  $('updGo').classList.remove('busy'); $('updX').style.display = '';
+  $('updGo').onclick = e => {
+    if($('updGo').classList.contains('busy')){ e.preventDefault(); return; }
+    // show it's working straight away: the new version takes a few seconds to load
+    $('updGo').classList.add('busy'); $('updX').style.display = 'none';
+    $('updGo').innerHTML = '<span class="spin" aria-hidden="true"></span>Loading…';
+    $('updMsg').textContent = onGo ? 'Refreshing fixtures… please wait' : 'Loading the new version… please wait';
+    if(onGo){ e.preventDefault(); Promise.resolve(onGo()).finally(() => $('upd').classList.remove('show')); }
+  };
   $('upd').classList.add('show');
 }
 $('updX').onclick = () => { $('upd').classList.remove('show'); state.dismissed = state.pendingKey; };
@@ -844,7 +889,7 @@ async function checkUpdates(){
     if(r.stamp !== state.data.stamp){                              // fixtures/locations/teams changed
       if(busy()){
         state.pendingKey = 'd' + r.stamp;
-        if(state.dismissed !== state.pendingKey) showUpdate('Fixtures have been updated.', 'Refresh', () => { $('upd').classList.remove('show'); load(true).then(() => toast('Fixtures updated')); });
+        if(state.dismissed !== state.pendingKey) showUpdate('Fixtures have been updated.', 'Refresh', () => load(true).then(() => toast('Fixtures updated')));
       } else {
         await load(true); toast('Fixtures updated');
       }
@@ -974,7 +1019,12 @@ function wireRows(root){
   root.querySelectorAll('.m').forEach(el => el.onclick = e => {
     if(e.target.closest('a')) return;
     const lb = e.target.closest('[data-lineup]');
-    if(lb){ openLineup(state.data.matches.find(m => String(m.row) === lb.dataset.lineup)); return; }
+    if(lb){
+      if(lb.disabled) return;
+      const label = lb.innerHTML; lb.disabled = true; lb.innerHTML = '<span class="spin" aria-hidden="true" style="display:inline-block;width:12px;height:12px;border-width:2px;vertical-align:-1px;margin-right:6px"></span>Opening…';
+      openLineup(state.data.matches.find(m => String(m.row) === lb.dataset.lineup)).finally(() => { lb.disabled = false; lb.innerHTML = label; });
+      return;
+    }
     const eb = e.target.closest('[data-edit]');
     if(eb){ openForm(state.data.matches.find(m => String(m.row) === eb.dataset.edit)); return; }
     el.classList.toggle('open');
