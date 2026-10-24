@@ -13,7 +13,8 @@
  * run splitIntoSeparateColumns() once to convert them.
  */
 
-const APP_VERSION = '1.28.0';
+const APP_VERSION = '1.28.1';
+const DEFAULT_ICON_URL = 'https://raw.githubusercontent.com/shanki412-ship-it/ClubFixtures/main/assets/acbc-icon-512.png';
 const BUILD = '__BUILD__';           // replaced with "date · commit" by the GitHub deploy
 
 const MATCHES_SHEET = 'Matches';     // falls back to any tab with "Our Team" + "Opponent" headers
@@ -127,7 +128,8 @@ function doGet() {
     .setTitle(s.title)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  const icon = iconHref_(s.iconUrl);
+  // Blank Icon URL → use the ACBC badge from the public GitHub repo.
+  const icon = iconHref_(s.iconUrl || DEFAULT_ICON_URL);
   if (icon) { try { page.setFaviconUrl(icon); } catch (e) { console.warn('Icon URL not accepted: ' + e); } }
   return page;
 }

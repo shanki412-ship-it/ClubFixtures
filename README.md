@@ -140,8 +140,8 @@ teams with fixtures show their match count instead, and the server refuses the r
   remembers its own choice.
 - Colours follow the ACBC jersey (navy with mint triangles); the logo is a vector redraw in
   `assets/acbc-logo.svg` (a 1024px PNG is alongside for printing or WhatsApp).
-- **Browser-tab icon**: upload `assets/acbc-icon-512.png` to Google Drive, Share → *Anyone with the link*,
-  copy the link and paste it into **Settings → Icon URL**. The app converts Drive links automatically.
+- **Browser-tab icon**: shows the ACBC badge (`assets/acbc-icon-512.png`, served from this public repo)
+  automatically. To use a different image, paste its link (Drive links work) into **Settings → Icon URL**.
 - The title comes from **Settings → App Title** (default "ACBC Juvenile League 2026-27").
 - The footer shows the version, e.g. `v1.8.0 · 21 Oct 2026 · 65d2fe6`. The date and commit are stamped
   automatically by each deploy; bump `APP_VERSION` in `src/Code.gs` for bigger releases.
